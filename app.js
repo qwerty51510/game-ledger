@@ -830,6 +830,10 @@ async function init() {
   updateSyncBar();
 
   if (isCloudSync()) {
+    if (Sync.getConfig().syncMode === 'supabase' && !window.supabase?.createClient) {
+      updateSyncBar('error', 'Supabase SDK 載入失敗，請檢查網路或換網路');
+      return;
+    }
     await refreshFromRemote();
     startAutoRefresh();
   }
