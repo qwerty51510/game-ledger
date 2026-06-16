@@ -12,7 +12,7 @@ const GAME_TYPE_ORDER = ['poker', 'mahjong', 'sports'];
 // 固定參賽者；avatar 預設值可被雲端頭像覆蓋
 const FIXED_PLAYERS = [
   { id: 'oli', name: '奥利', avatar: null },
-  { id: 'dabai', name: '大白', avatar: null },
+  { id: 'dabai', name: '大白', avatar: 'avatars/dabai.png' },
   { id: 'finn', name: '芬恩', avatar: 'avatars/finn.png' },
   { id: 'kevin', name: '凯文', avatar: null },
   { id: 'anderson', name: '安德森', avatar: null },
