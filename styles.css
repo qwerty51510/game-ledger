@@ -512,15 +512,15 @@ input[type="number"] {
 
 .player-detail-header {
   display: flex;
-  align-items: center;
-  gap: 14px;
+  align-items: flex-start;
+  gap: 16px;
   margin-bottom: 20px;
 }
 
 .player-detail-avatar {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
+  width: 140px;
+  height: 140px;
+  border-radius: 12px;
   background: var(--surface2);
   border: 1px solid var(--border);
   display: flex;
@@ -528,7 +528,7 @@ input[type="number"] {
   justify-content: center;
   overflow: hidden;
   flex-shrink: 0;
-  font-size: 2.25rem;
+  font-size: 2.5rem;
 }
 
 .player-detail-avatar img {
