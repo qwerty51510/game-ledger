@@ -10,6 +10,7 @@ window.LEDGER_CONFIG = {
 
   // Supabase（免費雲端資料庫，見 supabase/schema.sql）
   supabaseUrl: '',
+  // publishable key 或 anon public key 均可
   supabaseAnonKey: '',
 
   // 自動重新整理間隔（秒），0 = 關閉
