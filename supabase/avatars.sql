@@ -1,22 +1,5 @@
--- 在 Supabase SQL Editor 執行此腳本
+-- 若你已經跑過 schema.sql，只需在 SQL Editor 執行這份
 
-create table if not exists entries (
-  id text primary key,
-  date text not null,
-  type text not null,
-  note text default '',
-  scores jsonb not null default '{}',
-  created_at bigint not null default 0
-);
-
-alter table entries enable row level security;
-
-create policy "entries_read" on entries for select using (true);
-create policy "entries_insert" on entries for insert with check (true);
-create policy "entries_update" on entries for update using (true);
-create policy "entries_delete" on entries for delete using (true);
-
--- 參賽者頭像（雲端同步）
 create table if not exists player_avatars (
   player_id text primary key,
   avatar_url text not null,
@@ -25,11 +8,14 @@ create table if not exists player_avatars (
 
 alter table player_avatars enable row level security;
 
+drop policy if exists "player_avatars_read" on player_avatars;
+drop policy if exists "player_avatars_insert" on player_avatars;
+drop policy if exists "player_avatars_update" on player_avatars;
+
 create policy "player_avatars_read" on player_avatars for select using (true);
 create policy "player_avatars_insert" on player_avatars for insert with check (true);
 create policy "player_avatars_update" on player_avatars for update using (true);
 
--- Storage bucket（頭像圖片）
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('avatars', 'avatars', true, 524288, array['image/jpeg','image/png','image/webp','image/gif'])
 on conflict (id) do update set public = true, file_size_limit = 524288;

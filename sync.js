@@ -136,12 +136,68 @@ const Sync = (() => {
     }
   }
 
+  function supportsAvatars() {
+    return getConfig().syncMode === 'supabase' && isActive();
+  }
+
+  async function loadAvatars() {
+    const cfg = getConfig();
+    if (!supportsAvatars()) return {};
+    const res = await fetch(`${cfg.supabaseUrl}/rest/v1/player_avatars?select=*`, {
+      headers: supabaseHeaders(cfg),
+    });
+    if (!res.ok) throw new Error(`頭像讀取失敗 (${res.status})`);
+    const rows = await res.json();
+    const map = {};
+    rows.forEach((row) => {
+      const cacheBust = row.updated_at ? `?t=${row.updated_at}` : '';
+      map[row.player_id] = `${row.avatar_url}${cacheBust}`;
+    });
+    return map;
+  }
+
+  async function uploadAvatar(playerId, blob) {
+    const cfg = getConfig();
+    if (!supportsAvatars()) throw new Error('目前僅 Supabase 模式支援頭像上傳');
+
+    const path = `${playerId}.jpg`;
+    const uploadRes = await fetch(`${cfg.supabaseUrl}/storage/v1/object/avatars/${path}`, {
+      method: 'POST',
+      headers: {
+        apikey: cfg.supabaseAnonKey,
+        Authorization: `Bearer ${cfg.supabaseAnonKey}`,
+        'Content-Type': 'image/jpeg',
+        'x-upsert': 'true',
+      },
+      body: blob,
+    });
+    if (!uploadRes.ok) throw new Error(`頭像上傳失敗 (${uploadRes.status})`);
+
+    const avatarUrl = `${cfg.supabaseUrl}/storage/v1/object/public/avatars/${path}`;
+    const updatedAt = Date.now();
+    const dbRes = await fetch(`${cfg.supabaseUrl}/rest/v1/player_avatars`, {
+      method: 'POST',
+      headers: supabaseHeaders(cfg, { Prefer: 'resolution=merge-duplicates' }),
+      body: JSON.stringify({
+        player_id: playerId,
+        avatar_url: avatarUrl,
+        updated_at: updatedAt,
+      }),
+    });
+    if (!dbRes.ok) throw new Error(`頭像資料寫入失敗 (${dbRes.status})`);
+
+    return `${avatarUrl}?t=${updatedAt}`;
+  }
+
   return {
     getConfig,
     mode,
     isActive,
     label,
+    supportsAvatars,
     loadEntries,
+    loadAvatars,
+    uploadAvatar,
     upsertEntry,
     deleteEntry,
     bulkReplace,

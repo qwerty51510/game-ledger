@@ -9,7 +9,7 @@ const GAME_TYPES = {
 
 const GAME_TYPE_ORDER = ['poker', 'mahjong', 'sports'];
 
-// 固定參賽者；avatar 可之後補上圖片路徑，例如 'avatars/oli.jpg'
+// 固定參賽者；avatar 預設值可被雲端頭像覆蓋
 const FIXED_PLAYERS = [
   { id: 'oli', name: '奥利', avatar: null },
   { id: 'dabai', name: '大白', avatar: null },
@@ -21,8 +21,10 @@ const FIXED_PLAYERS = [
 ];
 
 let state = loadState();
+let cloudAvatars = {};
 let editingEntryId = null;
 let refreshTimer = null;
+let currentDetailPlayerId = null;
 
 // ── Storage ──────────────────────────────────────────
 
@@ -51,7 +53,39 @@ function isCloudSync() {
 }
 
 function getPlayers() {
-  return FIXED_PLAYERS;
+  return FIXED_PLAYERS.map((p) => ({
+    ...p,
+    avatar: cloudAvatars[p.id] || p.avatar,
+  }));
+}
+
+function getPlayerById(id) {
+  return getPlayers().find((p) => p.id === id);
+}
+
+async function compressImageToBlob(file, maxSize = 256) {
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const res = await fetch(dataUrl);
+  return res.blob();
 }
 
 // ── Utils ────────────────────────────────────────────
@@ -120,10 +154,6 @@ function avatarHTML(player) {
   return `<span class="avatar-initial">${escapeHTML(player.name.charAt(0))}</span>`;
 }
 
-function getPlayerById(id) {
-  return FIXED_PLAYERS.find((p) => p.id === id);
-}
-
 // ── Stats ────────────────────────────────────────────
 
 function getFilteredEntries() {
@@ -180,7 +210,7 @@ function renderSummary() {
   const grid = document.getElementById('summaryGrid');
   const totals = computeTotals(getFilteredEntries());
 
-  grid.innerHTML = FIXED_PLAYERS.map((p) => {
+  grid.innerHTML = getPlayers().map((p) => {
     const t = totals[p.id] || 0;
     const cls = scoreClass(t);
     return `
@@ -200,7 +230,7 @@ function renderScoreInputs(containerId = 'scoreInputs', prefix = '') {
   const container = document.getElementById(containerId);
   if (!container) return;
 
-  container.innerHTML = FIXED_PLAYERS.map((p) => `
+  container.innerHTML = getPlayers().map((p) => `
     <div class="score-field">
       <div class="mini-avatar">${avatarHTML(p)}</div>
       <span class="player-name">${escapeHTML(p.name)}</span>
@@ -237,7 +267,7 @@ function renderLedger() {
 
   head.innerHTML = `<tr>
     <th>日期</th>
-    ${FIXED_PLAYERS.map((p) => `<th>${escapeHTML(p.name)}</th>`).join('')}
+    ${getPlayers().map((p) => `<th>${escapeHTML(p.name)}</th>`).join('')}
     <th>+/- 結算</th>
     <th></th>
   </tr>`;
@@ -252,7 +282,7 @@ function renderLedger() {
         <span class="type-badge ${type.badge}">${type.short}</span>
         ${entry.note ? `<span class="note-inline">${escapeHTML(entry.note)}</span>` : ''}
       </td>
-      ${FIXED_PLAYERS.map((p) => {
+      ${getPlayers().map((p) => {
         const s = entry.scores[p.id] || 0;
         return `<td class="${scoreClass(s)}">${formatNum(s)}</td>`;
       }).join('')}
@@ -304,6 +334,12 @@ function renderPlayerDetail(playerId) {
       <div>
         <h3>${escapeHTML(player.name)}</h3>
         <p class="hint-text">各項目總和與歷史記錄</p>
+        ${Sync.supportsAvatars() ? `
+          <label class="btn btn-ghost btn-sm avatar-upload-btn">
+            上傳頭像（全員可見）
+            <input type="file" class="avatar-upload-input" accept="image/*" hidden>
+          </label>
+        ` : ''}
       </div>
       <div class="player-detail-total ${scoreClass(total)}">${formatNum(total)}</div>
     </div>
@@ -335,8 +371,43 @@ function renderPlayerDetail(playerId) {
 }
 
 function openPlayerDetail(playerId) {
+  currentDetailPlayerId = playerId;
   renderPlayerDetail(playerId);
-  document.getElementById('playerDialog').showModal();
+  const dialog = document.getElementById('playerDialog');
+  dialog.showModal();
+
+  const input = dialog.querySelector('.avatar-upload-input');
+  if (input) {
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (file) await handleAvatarUpload(playerId, file);
+    };
+  }
+}
+
+async function handleAvatarUpload(playerId, file) {
+  if (!Sync.supportsAvatars()) {
+    alert('請先連線 Supabase 才能上傳頭像');
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    alert('圖片太大，請選擇 5MB 以下的檔案');
+    return;
+  }
+  try {
+    updateSyncBar('loading', '上傳頭像中...');
+    const blob = await compressImageToBlob(file);
+    const url = await Sync.uploadAvatar(playerId, blob);
+    cloudAvatars[playerId] = url;
+    renderPlayerDetail(playerId);
+    render();
+    updateSyncBar('ok');
+    alert('頭像已更新，所有人都看得到！');
+  } catch (error) {
+    updateSyncBar('error', `上傳失敗：${error.message}`);
+    alert(`上傳失敗：${error.message}`);
+  }
 }
 
 function updateBalance(barId, valueId, hintId, btnId, scores) {
@@ -528,8 +599,13 @@ async function refreshFromRemote() {
   if (!isCloudSync()) return;
   updateSyncBar('loading', '同步中...');
   try {
-    const entries = await Sync.loadEntries();
+    const entriesPromise = Sync.loadEntries();
+    const avatarsPromise = Sync.supportsAvatars()
+      ? Sync.loadAvatars().catch(() => ({}))
+      : Promise.resolve({});
+    const [entries, avatars] = await Promise.all([entriesPromise, avatarsPromise]);
     state.entries = entries;
+    cloudAvatars = avatars;
     saveStateLocal();
     render();
     updateSyncBar('ok', `已連線：${Sync.label()} · 剛剛更新`);

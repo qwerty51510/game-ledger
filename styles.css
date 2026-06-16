@@ -520,6 +520,11 @@ select:focus {
   font-variant-numeric: tabular-nums;
 }
 
+.avatar-upload-btn {
+  margin-top: 8px;
+  cursor: pointer;
+}
+
 .detail-section-title {
   font-size: 0.9rem;
   color: var(--text-muted);
