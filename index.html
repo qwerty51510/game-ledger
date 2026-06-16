@@ -83,9 +83,12 @@
         <div class="btn-group">
           <button type="button" class="btn btn-ghost" id="exportBtn">下載備份</button>
           <button type="button" class="btn btn-ghost" id="copyExportBtn">複製備份文字</button>
-          <button type="button" class="btn btn-ghost" id="pasteImportBtn">貼上匯入</button>
+          <button type="button" class="btn btn-ghost" id="pasteImportBtn">貼上合併匯入</button>
         </div>
       </div>
+      <p class="hint-text sync-hint">
+        <strong>多人記帳：</strong>每人記完後點「複製備份文字」貼到群組 → 其他人用「合併匯入」同步（不會蓋掉自己記的）。
+      </p>
       <div class="table-wrap">
         <table class="ledger-table" id="ledgerTable">
           <thead id="ledgerHead"></thead>
@@ -97,9 +100,11 @@
 
     <footer class="footer">
       <label class="btn btn-ghost btn-sm">
-        匯入備份
+        合併匯入檔案
         <input type="file" id="importFile" accept=".json" hidden>
       </label>
+      <button type="button" class="btn btn-ghost btn-sm" id="importOverwriteBtn">覆蓋匯入檔案</button>
+      <input type="file" id="importOverwriteFile" accept=".json" hidden>
       <button type="button" class="btn btn-ghost btn-sm btn-danger" id="clearBtn">清除所有記錄</button>
     </footer>
   </div>
@@ -146,14 +151,15 @@
   <!-- 貼上匯入 Modal -->
   <dialog id="pasteDialog" class="modal">
     <form id="pasteForm" method="dialog">
-      <h3>貼上匯入</h3>
+      <h3>貼上合併匯入</h3>
       <p class="hint-text" style="margin-bottom: 12px;">
-        將「複製備份文字」貼到下方。匯入會覆蓋你目前的記錄。
+        貼上群組裡的備份文字。<strong>合併匯入</strong>會保留你本地記錄，並加入別人新增的項目。
       </p>
       <textarea id="pasteTextarea" class="paste-textarea" rows="10" placeholder="在這裡貼上 JSON..."></textarea>
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" id="pasteCancel">取消</button>
-        <button type="submit" class="btn btn-primary" id="pasteConfirm">匯入並覆蓋</button>
+        <button type="button" class="btn btn-ghost" id="pasteOverwrite">覆蓋匯入</button>
+        <button type="submit" class="btn btn-primary" id="pasteConfirm">合併匯入</button>
       </div>
     </form>
   </dialog>

@@ -425,6 +425,15 @@ select:focus {
   margin-bottom: 16px;
 }
 
+.sync-hint {
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.sync-hint strong {
+  color: var(--text);
+}
+
 /* Modal */
 .modal {
   background: var(--surface);

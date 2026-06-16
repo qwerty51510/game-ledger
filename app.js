@@ -387,6 +387,51 @@ function applyImportedData(data) {
   state = { entries: data.entries };
 }
 
+function mergeImportedData(imported) {
+  const merged = new Map(state.entries.map((e) => [e.id, e]));
+  let added = 0;
+  let updated = 0;
+
+  imported.entries.forEach((remote) => {
+    const local = merged.get(remote.id);
+    if (!local) {
+      merged.set(remote.id, remote);
+      added++;
+      return;
+    }
+    const localTime = local.createdAt || 0;
+    const remoteTime = remote.createdAt || 0;
+    if (remoteTime > localTime) {
+      merged.set(remote.id, remote);
+      updated++;
+    }
+  });
+
+  state.entries = Array.from(merged.values());
+  return { added, updated, total: state.entries.length };
+}
+
+function processImport(data, mode) {
+  const err = validateDataShape(data);
+  if (err) {
+    alert(`備份格式不正確：${err}`);
+    return false;
+  }
+
+  if (mode === 'overwrite') {
+    if (!confirm('覆蓋匯入會以備份為準，你本地多出的記錄會消失，確定繼續？')) return false;
+    applyImportedData(data);
+    saveState();
+    alert('覆蓋匯入成功！');
+    return true;
+  }
+
+  const result = mergeImportedData(data);
+  saveState();
+  alert(`合併完成！新增 ${result.added} 筆，更新 ${result.updated} 筆，共 ${result.total} 筆記錄。`);
+  return true;
+}
+
 async function copyTextToClipboard(text) {
   try {
     await navigator.clipboard.writeText(text);
@@ -512,24 +557,16 @@ async function copyExportText() {
   const payload = buildExportPayload();
   const text = JSON.stringify(payload);
   const ok = await copyTextToClipboard(text);
-  if (ok) alert('已複製！把這段文字貼到群組，其他人用「貼上匯入」即可。');
+  if (ok) alert('已複製！貼到群組後，其他人用「合併匯入」即可同步，不會蓋掉各自記的帳。');
   else alert('複製失敗：請改用「下載備份」檔案分享。');
 }
 
-function importData(file) {
+function importData(file, mode = 'merge') {
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
       const data = parseImportPayload(e.target.result);
-      const err = validateDataShape(data);
-      if (err) {
-        alert(`備份檔案格式不正確：${err}`);
-        return;
-      }
-      if (!confirm('匯入會覆蓋現有記錄，確定繼續？')) return;
-      applyImportedData(data);
-      saveState();
-      alert('匯入成功！');
+      processImport(data, mode);
     } catch {
       alert('無法讀取備份檔案');
     }
@@ -549,8 +586,8 @@ function closePasteImport() {
   document.getElementById('pasteDialog').close();
 }
 
-function confirmPasteImport(e) {
-  e.preventDefault();
+function confirmPasteImport(e, mode = 'merge') {
+  if (e) e.preventDefault();
   const ta = document.getElementById('pasteTextarea');
   const text = (ta.value || '').trim();
   if (!text) return;
@@ -563,17 +600,9 @@ function confirmPasteImport(e) {
     return;
   }
 
-  const err = validateDataShape(data);
-  if (err) {
-    alert(`貼上匯入失敗：${err}`);
-    return;
+  if (processImport(data, mode)) {
+    closePasteImport();
   }
-
-  if (!confirm('匯入會覆蓋現有記錄，確定繼續？')) return;
-  applyImportedData(data);
-  closePasteImport();
-  saveState();
-  alert('匯入成功！');
 }
 
 function clearAll() {
@@ -602,11 +631,21 @@ function init() {
   document.getElementById('clearBtn').addEventListener('click', clearAll);
 
   document.getElementById('importFile').addEventListener('change', (e) => {
-    if (e.target.files[0]) importData(e.target.files[0]);
+    if (e.target.files[0]) importData(e.target.files[0], 'merge');
     e.target.value = '';
   });
 
-  document.getElementById('pasteForm').addEventListener('submit', confirmPasteImport);
+  document.getElementById('importOverwriteBtn').addEventListener('click', () => {
+    document.getElementById('importOverwriteFile').click();
+  });
+
+  document.getElementById('importOverwriteFile').addEventListener('change', (e) => {
+    if (e.target.files[0]) importData(e.target.files[0], 'overwrite');
+    e.target.value = '';
+  });
+
+  document.getElementById('pasteForm').addEventListener('submit', (e) => confirmPasteImport(e, 'merge'));
+  document.getElementById('pasteOverwrite').addEventListener('click', () => confirmPasteImport(null, 'overwrite'));
   document.getElementById('pasteCancel').addEventListener('click', closePasteImport);
 
   render();
