@@ -37,6 +37,8 @@ const Sync = (() => {
     return {
       apikey: cfg.supabaseAnonKey,
       Authorization: `Bearer ${cfg.supabaseAnonKey}`,
+      'Accept-Profile': 'public',
+      'Content-Profile': 'public',
       'Content-Type': 'application/json',
       Prefer: 'return=minimal',
       ...extra,

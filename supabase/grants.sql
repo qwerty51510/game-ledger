@@ -8,3 +8,4 @@ grant select, insert, update, delete on public.player_avatars to anon, authentic
 
 -- 若仍 404，到 Dashboard → Integrations → Data API → Settings
 -- 确认 Exposed schemas 包含 public，且 entries / player_avatars 已开启
+-- 若默认 schema 是 api，网页端需加 Accept-Profile: public（已在 sync.js 处理）
