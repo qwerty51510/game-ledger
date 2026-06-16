@@ -318,6 +318,12 @@ select:focus {
   min-width: auto;
 }
 
+.btn-group {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* Table */
 .table-wrap {
   overflow-x: auto;
@@ -549,6 +555,25 @@ select:focus {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 16px;
+}
+
+.paste-textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 180px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  outline: none;
+}
+
+.paste-textarea:focus {
+  border-color: var(--positive);
 }
 
 .footer {

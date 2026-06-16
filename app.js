@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'game-ledger-data';
+const EXPORT_SCHEMA_VERSION = 1;
 const GAME_TYPES = {
   poker: { label: '德州扑克', short: '德', badge: 'poker' },
   mahjong: { label: '麻将', short: '麻', badge: 'mahjong' },
@@ -34,6 +35,10 @@ function uid() {
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function nowISO() {
+  return new Date().toISOString();
 }
 
 function formatDate(iso) {
@@ -282,6 +287,65 @@ function escapeHTML(str) {
   return div.innerHTML;
 }
 
+function buildExportPayload() {
+  return {
+    schema: 'game-ledger',
+    version: EXPORT_SCHEMA_VERSION,
+    exportedAt: nowISO(),
+    data: state,
+  };
+}
+
+function parseImportPayload(text) {
+  const raw = JSON.parse(text);
+  if (raw && raw.schema === 'game-ledger' && raw.data) {
+    return raw.data;
+  }
+  return raw;
+}
+
+function validateDataShape(data) {
+  if (!data || typeof data !== 'object') return '內容不是物件';
+  if (!Array.isArray(data.players) || !Array.isArray(data.entries)) return '缺少 players / entries';
+  for (const p of data.players) {
+    if (!p || typeof p !== 'object') return 'players 格式錯誤';
+    if (typeof p.id !== 'string' || typeof p.name !== 'string') return 'players 欄位不完整';
+  }
+  for (const e of data.entries) {
+    if (!e || typeof e !== 'object') return 'entries 格式錯誤';
+    if (typeof e.id !== 'string' || typeof e.date !== 'string' || typeof e.type !== 'string') return 'entries 欄位不完整';
+    if (!e.scores || typeof e.scores !== 'object') return 'entries.scores 格式錯誤';
+    if (!(e.type in GAME_TYPES)) return `未知種類：${e.type}`;
+    // 允許舊備份沒有 createdAt / note
+  }
+  return null;
+}
+
+async function copyTextToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (_) {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', 'readonly');
+    ta.style.position = 'fixed';
+    ta.style.top = '-9999px';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    let ok = false;
+    try {
+      ok = document.execCommand('copy');
+    } catch (_) {
+      ok = false;
+    }
+    document.body.removeChild(ta);
+    return ok;
+  }
+}
+
 // ── Form helpers ─────────────────────────────────────
 
 function getFormScores() {
@@ -399,7 +463,8 @@ function removePlayer(id) {
 }
 
 function exportData() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const payload = buildExportPayload();
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -408,13 +473,22 @@ function exportData() {
   URL.revokeObjectURL(url);
 }
 
+async function copyExportText() {
+  const payload = buildExportPayload();
+  const text = JSON.stringify(payload);
+  const ok = await copyTextToClipboard(text);
+  if (ok) alert('已複製！把這段文字貼到群組，其他人用「貼上匯入」即可。');
+  else alert('複製失敗：請改用「下載備份」檔案分享。');
+}
+
 function importData(file) {
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
-      const data = JSON.parse(e.target.result);
-      if (!Array.isArray(data.players) || !Array.isArray(data.entries)) {
-        alert('備份檔案格式不正確');
+      const data = parseImportPayload(e.target.result);
+      const err = validateDataShape(data);
+      if (err) {
+        alert(`備份檔案格式不正確：${err}`);
         return;
       }
       if (!confirm('匯入會覆蓋現有資料，確定繼續？')) return;
@@ -426,6 +500,45 @@ function importData(file) {
     }
   };
   reader.readAsText(file);
+}
+
+function openPasteImport() {
+  const dialog = document.getElementById('pasteDialog');
+  const ta = document.getElementById('pasteTextarea');
+  ta.value = '';
+  dialog.showModal();
+  setTimeout(() => ta.focus(), 50);
+}
+
+function closePasteImport() {
+  document.getElementById('pasteDialog').close();
+}
+
+function confirmPasteImport(e) {
+  e.preventDefault();
+  const ta = document.getElementById('pasteTextarea');
+  const text = (ta.value || '').trim();
+  if (!text) return;
+
+  let data;
+  try {
+    data = parseImportPayload(text);
+  } catch {
+    alert('貼上的內容不是有效 JSON');
+    return;
+  }
+
+  const err = validateDataShape(data);
+  if (err) {
+    alert(`貼上匯入失敗：${err}`);
+    return;
+  }
+
+  if (!confirm('匯入會覆蓋現有資料，確定繼續？')) return;
+  state = data;
+  closePasteImport();
+  saveState();
+  alert('匯入成功！');
 }
 
 function clearAll() {
@@ -447,12 +560,17 @@ function init() {
   });
   document.getElementById('filterType').addEventListener('change', render);
   document.getElementById('exportBtn').addEventListener('click', exportData);
+  document.getElementById('copyExportBtn').addEventListener('click', copyExportText);
+  document.getElementById('pasteImportBtn').addEventListener('click', openPasteImport);
   document.getElementById('clearBtn').addEventListener('click', clearAll);
 
   document.getElementById('importFile').addEventListener('change', (e) => {
     if (e.target.files[0]) importData(e.target.files[0]);
     e.target.value = '';
   });
+
+  document.getElementById('pasteForm').addEventListener('submit', confirmPasteImport);
+  document.getElementById('pasteCancel').addEventListener('click', closePasteImport);
 
   document.getElementById('newAvatarFile').addEventListener('change', async (e) => {
     const file = e.target.files[0];

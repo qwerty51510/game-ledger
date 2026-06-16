@@ -69,7 +69,11 @@
     <section class="card">
       <div class="card-header">
         <h2>歷史記錄</h2>
-        <button type="button" class="btn btn-ghost" id="exportBtn">匯出備份</button>
+        <div class="btn-group">
+          <button type="button" class="btn btn-ghost" id="exportBtn">下載備份</button>
+          <button type="button" class="btn btn-ghost" id="copyExportBtn">複製備份文字</button>
+          <button type="button" class="btn btn-ghost" id="pasteImportBtn">貼上匯入</button>
+        </div>
       </div>
       <div class="table-wrap">
         <table class="ledger-table" id="ledgerTable">
@@ -143,6 +147,21 @@
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" id="editCancel">取消</button>
         <button type="submit" class="btn btn-primary" id="editSave">儲存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 貼上匯入 Modal -->
+  <dialog id="pasteDialog" class="modal">
+    <form id="pasteForm" method="dialog">
+      <h3>貼上匯入（方案 A）</h3>
+      <p class="hint-text" style="margin-bottom: 12px;">
+        將「複製備份文字」貼到下方。匯入會覆蓋你目前的資料。
+      </p>
+      <textarea id="pasteTextarea" class="paste-textarea" rows="10" placeholder="在這裡貼上 JSON..."></textarea>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="pasteCancel">取消</button>
+        <button type="submit" class="btn btn-primary" id="pasteConfirm">匯入並覆蓋</button>
       </div>
     </form>
   </dialog>
