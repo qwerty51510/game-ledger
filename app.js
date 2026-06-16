@@ -232,8 +232,10 @@ function renderScoreInputs(containerId = 'scoreInputs', prefix = '') {
 
   container.innerHTML = getPlayers().map((p) => `
     <div class="score-field">
-      <div class="mini-avatar">${avatarHTML(p)}</div>
-      <span class="player-name">${escapeHTML(p.name)}</span>
+      <div class="score-field-header">
+        <div class="mini-avatar">${avatarHTML(p)}</div>
+        <span class="player-name">${escapeHTML(p.name)}</span>
+      </div>
       <input type="number" step="any" data-player="${p.id}" id="${prefix}score-${p.id}"
         placeholder="0" value="0">
     </div>
