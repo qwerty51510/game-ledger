@@ -50,6 +50,34 @@ body {
   margin-top: 4px;
 }
 
+.sync-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.sync-bar.sync-ok {
+  border-color: rgba(52, 211, 153, 0.45);
+  color: var(--success);
+}
+
+.sync-bar.sync-error {
+  border-color: rgba(255, 92, 106, 0.45);
+  color: var(--negative);
+}
+
+.sync-bar.sync-loading {
+  border-color: rgba(59, 158, 255, 0.45);
+  color: var(--positive);
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);

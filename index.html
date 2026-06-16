@@ -21,6 +21,10 @@
     <header class="header">
       <h1>決鬥帳本</h1>
       <p class="subtitle">零和記帳 · 誰贏誰輸加總必為 0</p>
+      <div id="syncBar" class="sync-bar">
+        <span id="syncStatus">載入中...</span>
+        <button type="button" class="btn btn-ghost btn-sm" id="refreshBtn" hidden>重新整理</button>
+      </div>
     </header>
 
     <!-- 總覽 -->
@@ -86,7 +90,7 @@
           <button type="button" class="btn btn-ghost" id="pasteImportBtn">貼上合併匯入</button>
         </div>
       </div>
-      <p class="hint-text sync-hint">
+      <p class="hint-text sync-hint" id="syncHint">
         <strong>多人記帳：</strong>每人記完後點「複製備份文字」貼到群組 → 其他人用「合併匯入」同步（不會蓋掉自己記的）。
       </p>
       <div class="table-wrap">
@@ -164,6 +168,8 @@
     </form>
   </dialog>
 
+  <script src="config.js"></script>
+  <script src="sync.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

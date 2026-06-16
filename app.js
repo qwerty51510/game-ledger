@@ -22,6 +22,7 @@ const FIXED_PLAYERS = [
 
 let state = loadState();
 let editingEntryId = null;
+let refreshTimer = null;
 
 // ── Storage ──────────────────────────────────────────
 
@@ -36,9 +37,17 @@ function loadState() {
   return { entries: [] };
 }
 
-function saveState() {
+function saveStateLocal() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function saveState() {
+  saveStateLocal();
   render();
+}
+
+function isCloudSync() {
+  return Sync.isActive();
 }
 
 function getPlayers() {
@@ -415,21 +424,30 @@ function processImport(data, mode) {
   const err = validateDataShape(data);
   if (err) {
     alert(`備份格式不正確：${err}`);
-    return false;
+    return Promise.resolve(false);
   }
 
-  if (mode === 'overwrite') {
-    if (!confirm('覆蓋匯入會以備份為準，你本地多出的記錄會消失，確定繼續？')) return false;
-    applyImportedData(data);
+  const run = async () => {
+    if (mode === 'overwrite') {
+      if (!confirm('覆蓋匯入會以備份為準，你本地多出的記錄會消失，確定繼續？')) return false;
+      applyImportedData(data);
+      if (isCloudSync()) await Sync.bulkReplace(state.entries);
+      saveState();
+      alert('覆蓋匯入成功！');
+      return true;
+    }
+
+    const result = mergeImportedData(data);
+    if (isCloudSync()) await Sync.bulkReplace(state.entries);
     saveState();
-    alert('覆蓋匯入成功！');
+    alert(`合併完成！新增 ${result.added} 筆，更新 ${result.updated} 筆，共 ${result.total} 筆記錄。`);
     return true;
-  }
+  };
 
-  const result = mergeImportedData(data);
-  saveState();
-  alert(`合併完成！新增 ${result.added} 筆，更新 ${result.updated} 筆，共 ${result.total} 筆記錄。`);
-  return true;
+  return run().catch((error) => {
+    alert(`同步失敗：${error.message}`);
+    return false;
+  });
 }
 
 async function copyTextToClipboard(text) {
@@ -476,35 +494,105 @@ function getEditScores() {
   return scores;
 }
 
+// ── Cloud sync ───────────────────────────────────────
+
+function updateSyncBar(status = 'idle', message = '') {
+  const bar = document.getElementById('syncBar');
+  const text = document.getElementById('syncStatus');
+  const refreshBtn = document.getElementById('refreshBtn');
+  const syncHint = document.getElementById('syncHint');
+  if (!bar || !text) return;
+
+  bar.classList.remove('sync-ok', 'sync-error', 'sync-loading');
+  if (status === 'ok') bar.classList.add('sync-ok');
+  if (status === 'error') bar.classList.add('sync-error');
+  if (status === 'loading') bar.classList.add('sync-loading');
+
+  if (message) {
+    text.textContent = message;
+  } else if (isCloudSync()) {
+    text.textContent = `已連線：${Sync.label()}`;
+  } else if (Sync.mode() !== 'local') {
+    text.textContent = `${Sync.label()}（請完成 config 設定）`;
+  } else {
+    text.textContent = '僅本地模式（備份需手動同步）';
+  }
+
+  if (refreshBtn) refreshBtn.hidden = !isCloudSync();
+  if (syncHint) {
+    syncHint.hidden = isCloudSync();
+  }
+}
+
+async function refreshFromRemote() {
+  if (!isCloudSync()) return;
+  updateSyncBar('loading', '同步中...');
+  try {
+    const entries = await Sync.loadEntries();
+    state.entries = entries;
+    saveStateLocal();
+    render();
+    updateSyncBar('ok', `已連線：${Sync.label()} · 剛剛更新`);
+  } catch (error) {
+    updateSyncBar('error', `同步失敗：${error.message}`);
+  }
+}
+
+function startAutoRefresh() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  const seconds = Sync.getConfig().autoRefreshSeconds || 0;
+  if (!isCloudSync() || seconds <= 0) return;
+  refreshTimer = setInterval(refreshFromRemote, seconds * 1000);
+}
+
 // ── Actions ──────────────────────────────────────────
 
-function addEntry(e) {
+async function addEntry(e) {
   e.preventDefault();
   const scores = getFormScores();
   if (sumScores(scores) !== 0) return;
 
-  state.entries.push({
+  const entry = {
     id: uid(),
     date: document.getElementById('entryDate').value,
     type: document.getElementById('entryType').value,
     note: document.getElementById('entryNote').value.trim(),
     scores,
     createdAt: Date.now(),
-  });
+  };
 
-  document.getElementById('entryNote').value = '';
-  FIXED_PLAYERS.forEach((p) => {
-    const input = document.getElementById(`score-${p.id}`);
-    if (input) input.value = '0';
-  });
-
-  saveState();
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  try {
+    if (isCloudSync()) await Sync.upsertEntry(entry);
+    state.entries.push(entry);
+    document.getElementById('entryNote').value = '';
+    FIXED_PLAYERS.forEach((p) => {
+      const input = document.getElementById(`score-${p.id}`);
+      if (input) input.value = '0';
+    });
+    saveState();
+    updateSyncBar('ok');
+  } catch (error) {
+    alert(`儲存失敗：${error.message}`);
+    updateSyncBar('error', `同步失敗：${error.message}`);
+  } finally {
+    submitBtn.disabled = false;
+    updateBalance('balanceBar', 'balanceValue', 'balanceHint', 'submitBtn', getFormScores());
+  }
 }
 
-function deleteEntry(id) {
+async function deleteEntry(id) {
   if (!confirm('確定刪除這筆記錄？')) return;
-  state.entries = state.entries.filter((e) => e.id !== id);
-  saveState();
+  try {
+    if (isCloudSync()) await Sync.deleteEntry(id);
+    state.entries = state.entries.filter((e) => e.id !== id);
+    saveState();
+    updateSyncBar('ok');
+  } catch (error) {
+    alert(`刪除失敗：${error.message}`);
+    updateSyncBar('error', `同步失敗：${error.message}`);
+  }
 }
 
 function openEdit(id) {
@@ -525,21 +613,28 @@ function openEdit(id) {
   document.getElementById('editDialog').showModal();
 }
 
-function saveEdit(e) {
+async function saveEdit(e) {
   e.preventDefault();
   const scores = getEditScores();
   if (sumScores(scores) !== 0) return;
 
-  const entry = state.entries.find((e) => e.id === editingEntryId);
+  const entry = state.entries.find((item) => item.id === editingEntryId);
   if (!entry) return;
 
   entry.date = document.getElementById('editDate').value;
   entry.type = document.getElementById('editType').value;
   entry.scores = scores;
 
-  document.getElementById('editDialog').close();
-  editingEntryId = null;
-  saveState();
+  try {
+    if (isCloudSync()) await Sync.upsertEntry(entry);
+    document.getElementById('editDialog').close();
+    editingEntryId = null;
+    saveState();
+    updateSyncBar('ok');
+  } catch (error) {
+    alert(`更新失敗：${error.message}`);
+    updateSyncBar('error', `同步失敗：${error.message}`);
+  }
 }
 
 function exportData() {
@@ -563,10 +658,10 @@ async function copyExportText() {
 
 function importData(file, mode = 'merge') {
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     try {
       const data = parseImportPayload(e.target.result);
-      processImport(data, mode);
+      await processImport(data, mode);
     } catch {
       alert('無法讀取備份檔案');
     }
@@ -586,7 +681,7 @@ function closePasteImport() {
   document.getElementById('pasteDialog').close();
 }
 
-function confirmPasteImport(e, mode = 'merge') {
+async function confirmPasteImport(e, mode = 'merge') {
   if (e) e.preventDefault();
   const ta = document.getElementById('pasteTextarea');
   const text = (ta.value || '').trim();
@@ -600,20 +695,26 @@ function confirmPasteImport(e, mode = 'merge') {
     return;
   }
 
-  if (processImport(data, mode)) {
-    closePasteImport();
-  }
+  const ok = await processImport(data, mode);
+  if (ok) closePasteImport();
 }
 
-function clearAll() {
+async function clearAll() {
   if (!confirm('確定清除所有記錄？此操作無法復原（除非你有備份）。')) return;
-  state = { entries: [] };
-  saveState();
+  try {
+    state = { entries: [] };
+    if (isCloudSync()) await Sync.bulkReplace([]);
+    saveState();
+    updateSyncBar('ok');
+  } catch (error) {
+    alert(`清除失敗：${error.message}`);
+    updateSyncBar('error', `同步失敗：${error.message}`);
+  }
 }
 
 // ── Init ─────────────────────────────────────────────
 
-function init() {
+async function init() {
   document.getElementById('entryDate').value = todayISO();
 
   document.getElementById('entryForm').addEventListener('submit', addEntry);
@@ -629,6 +730,7 @@ function init() {
   document.getElementById('copyExportBtn').addEventListener('click', copyExportText);
   document.getElementById('pasteImportBtn').addEventListener('click', openPasteImport);
   document.getElementById('clearBtn').addEventListener('click', clearAll);
+  document.getElementById('refreshBtn')?.addEventListener('click', refreshFromRemote);
 
   document.getElementById('importFile').addEventListener('change', (e) => {
     if (e.target.files[0]) importData(e.target.files[0], 'merge');
@@ -649,6 +751,12 @@ function init() {
   document.getElementById('pasteCancel').addEventListener('click', closePasteImport);
 
   render();
+  updateSyncBar();
+
+  if (isCloudSync()) {
+    await refreshFromRemote();
+    startAutoRefresh();
+  }
 }
 
 init();
