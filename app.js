@@ -17,7 +17,7 @@ const FIXED_PLAYERS = [
   { id: 'kevin', name: '凯文', avatar: null },
   { id: 'anderson', name: '安德森', avatar: null },
   { id: 'tang', name: '唐', avatar: 'avatars/tang.jpg' },
-  { id: 'allen', name: '艾伦', avatar: null },
+  { id: 'allen', name: '艾伦', avatar: 'avatars/allen.png' },
 ];
 
 let state = loadState();
