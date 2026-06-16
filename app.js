@@ -13,7 +13,7 @@ const GAME_TYPE_ORDER = ['poker', 'mahjong', 'sports'];
 const FIXED_PLAYERS = [
   { id: 'oli', name: '奥利', avatar: null },
   { id: 'dabai', name: '大白', avatar: null },
-  { id: 'finn', name: '芬恩', avatar: null },
+  { id: 'finn', name: '芬恩', avatar: 'avatars/finn.png' },
   { id: 'kevin', name: '凯文', avatar: null },
   { id: 'anderson', name: '安德森', avatar: null },
   { id: 'tang', name: '唐', avatar: 'avatars/tang.jpg' },
