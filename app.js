@@ -777,19 +777,6 @@ async function confirmPasteImport(e, mode = 'merge') {
   if (ok) closePasteImport();
 }
 
-async function clearAll() {
-  if (!confirm('確定清除所有記錄？此操作無法復原（除非你有備份）。')) return;
-  try {
-    state = { entries: [] };
-    if (isCloudSync()) await Sync.bulkReplace([]);
-    saveState();
-    updateSyncBar('ok');
-  } catch (error) {
-    alert(`清除失敗：${error.message}`);
-    updateSyncBar('error', `同步失敗：${error.message}`);
-  }
-}
-
 // ── Init ─────────────────────────────────────────────
 
 async function init() {
@@ -807,7 +794,6 @@ async function init() {
   document.getElementById('exportBtn').addEventListener('click', exportData);
   document.getElementById('copyExportBtn').addEventListener('click', copyExportText);
   document.getElementById('pasteImportBtn').addEventListener('click', openPasteImport);
-  document.getElementById('clearBtn').addEventListener('click', clearAll);
   document.getElementById('refreshBtn')?.addEventListener('click', refreshFromRemote);
 
   document.getElementById('importFile').addEventListener('change', (e) => {
