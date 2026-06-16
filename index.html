@@ -27,6 +27,7 @@
           </select>
         </div>
       </div>
+      <p class="hint-text">點擊參賽者可查看各項目總和與歷史記錄</p>
       <div id="summaryGrid" class="summary-grid"></div>
     </section>
 
@@ -84,39 +85,12 @@
       <p class="empty-hint" id="emptyHint">尚無記錄，請先新增一筆。</p>
     </section>
 
-    <!-- 玩家管理 -->
-    <section class="card">
-      <div class="card-header">
-        <h2>決鬥者管理</h2>
-      </div>
-      <p class="hint-text">頭像會存在你的瀏覽器本機，不需要伺服器。也可以選 emoji 當頭像。</p>
-
-      <div id="playerList" class="player-list"></div>
-
-      <form id="playerForm" class="player-form">
-        <div class="avatar-picker">
-          <div class="avatar-preview" id="newAvatarPreview">
-            <span class="avatar-initial">?</span>
-          </div>
-          <div class="avatar-options">
-            <label class="btn btn-ghost btn-sm">
-              上傳圖片
-              <input type="file" id="newAvatarFile" accept="image/*" hidden>
-            </label>
-            <div class="emoji-picker" id="emojiPicker"></div>
-          </div>
-        </div>
-        <input type="text" id="newPlayerName" placeholder="輸入名字" required maxlength="20">
-        <button type="submit" class="btn btn-primary">新增決鬥者</button>
-      </form>
-    </section>
-
     <footer class="footer">
       <label class="btn btn-ghost btn-sm">
         匯入備份
         <input type="file" id="importFile" accept=".json" hidden>
       </label>
-      <button type="button" class="btn btn-ghost btn-sm btn-danger" id="clearBtn">清除所有資料</button>
+      <button type="button" class="btn btn-ghost btn-sm btn-danger" id="clearBtn">清除所有記錄</button>
     </footer>
   </div>
 
@@ -151,12 +125,20 @@
     </form>
   </dialog>
 
+  <!-- 參賽者詳情 Modal -->
+  <dialog id="playerDialog" class="modal modal-wide">
+    <div id="playerDetail"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="playerClose">關閉</button>
+    </div>
+  </dialog>
+
   <!-- 貼上匯入 Modal -->
   <dialog id="pasteDialog" class="modal">
     <form id="pasteForm" method="dialog">
-      <h3>貼上匯入（方案 A）</h3>
+      <h3>貼上匯入</h3>
       <p class="hint-text" style="margin-bottom: 12px;">
-        將「複製備份文字」貼到下方。匯入會覆蓋你目前的資料。
+        將「複製備份文字」貼到下方。匯入會覆蓋你目前的記錄。
       </p>
       <textarea id="pasteTextarea" class="paste-textarea" rows="10" placeholder="在這裡貼上 JSON..."></textarea>
       <div class="modal-actions">

@@ -1,15 +1,26 @@
 const STORAGE_KEY = 'game-ledger-data';
-const EXPORT_SCHEMA_VERSION = 1;
+const EXPORT_SCHEMA_VERSION = 2;
+
 const GAME_TYPES = {
   poker: { label: '德州扑克', short: '德', badge: 'poker' },
   mahjong: { label: '麻将', short: '麻', badge: 'mahjong' },
   sports: { label: '体育', short: '体', badge: 'sports' },
 };
 
-const EMOJI_OPTIONS = ['🦈', '🐶', '🐦', '🐱', '🐻', '🦊', '🐼', '🦁', '🐸', '🐷', '🐵', '🦄'];
+const GAME_TYPE_ORDER = ['poker', 'mahjong', 'sports'];
+
+// 固定參賽者；avatar 可之後補上圖片路徑，例如 'avatars/oli.jpg'
+const FIXED_PLAYERS = [
+  { id: 'oli', name: '奥利', avatar: null },
+  { id: 'dabai', name: '大白', avatar: null },
+  { id: 'finn', name: '芬恩', avatar: null },
+  { id: 'kevin', name: '凯文', avatar: null },
+  { id: 'anderson', name: '安德森', avatar: null },
+  { id: 'tang', name: '唐', avatar: null },
+  { id: 'allen', name: '艾伦', avatar: null },
+];
 
 let state = loadState();
-let newPlayerAvatar = { type: 'emoji', value: EMOJI_OPTIONS[0] };
 let editingEntryId = null;
 
 // ── Storage ──────────────────────────────────────────
@@ -17,14 +28,21 @@ let editingEntryId = null;
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return { entries: Array.isArray(parsed.entries) ? parsed.entries : [] };
+    }
   } catch (_) {}
-  return { players: [], entries: [] };
+  return { entries: [] };
 }
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   render();
+}
+
+function getPlayers() {
+  return FIXED_PLAYERS;
 }
 
 // ── Utils ────────────────────────────────────────────
@@ -55,34 +73,70 @@ function sumScores(scores) {
   return Object.values(scores).reduce((a, b) => a + (Number(b) || 0), 0);
 }
 
-function avatarHTML(player, size = '') {
-  if (player.avatar?.type === 'image' && player.avatar.value) {
-    return `<img src="${player.avatar.value}" alt="">`;
-  }
-  const emoji = player.avatar?.value || player.name.charAt(0);
-  return size ? emoji : `<span>${emoji}</span>`;
+function scoreClass(n) {
+  if (n > 0) return 'positive';
+  if (n < 0) return 'negative';
+  return 'zero';
 }
 
-async function compressImage(file, maxSize = 128) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.75));
-      };
-      img.onerror = reject;
-      img.src = e.target.result;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+function escapeHTML(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function avatarHTML(player) {
+  if (player.avatar) {
+    return `<img src="${player.avatar}" alt="${escapeHTML(player.name)}">`;
+  }
+  return `<span class="avatar-initial">${escapeHTML(player.name.charAt(0))}</span>`;
+}
+
+function getPlayerById(id) {
+  return FIXED_PLAYERS.find((p) => p.id === id);
+}
+
+// ── Stats ────────────────────────────────────────────
+
+function getFilteredEntries() {
+  const filter = document.getElementById('filterType')?.value || 'all';
+  if (filter === 'all') return state.entries;
+  return state.entries.filter((e) => e.type === filter);
+}
+
+function computeTotals(entries, playerId = null) {
+  const totals = {};
+  FIXED_PLAYERS.forEach((p) => { totals[p.id] = 0; });
+  entries.forEach((entry) => {
+    FIXED_PLAYERS.forEach((p) => {
+      if (playerId && p.id !== playerId) return;
+      totals[p.id] += entry.scores[p.id] || 0;
+    });
   });
+  return totals;
+}
+
+function computePlayerBreakdown(playerId) {
+  const byType = { poker: 0, mahjong: 0, sports: 0 };
+  const history = [];
+
+  state.entries.forEach((entry) => {
+    const score = entry.scores[playerId] || 0;
+    byType[entry.type] = (byType[entry.type] || 0) + score;
+    history.push({
+      id: entry.id,
+      date: entry.date,
+      type: entry.type,
+      note: entry.note || '',
+      score,
+      createdAt: entry.createdAt || 0,
+    });
+  });
+
+  history.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+
+  const total = GAME_TYPE_ORDER.reduce((sum, type) => sum + byType[type], 0);
+  return { byType, total, history };
 }
 
 // ── Render ───────────────────────────────────────────
@@ -91,58 +145,34 @@ function render() {
   renderSummary();
   renderScoreInputs();
   renderLedger();
-  renderPlayers();
   updateBalance('balanceBar', 'balanceValue', 'balanceHint', 'submitBtn', getFormScores());
-}
-
-function getFilteredEntries() {
-  const filter = document.getElementById('filterType')?.value || 'all';
-  if (filter === 'all') return state.entries;
-  return state.entries.filter((e) => e.type === filter);
-}
-
-function computeTotals(entries) {
-  const totals = {};
-  state.players.forEach((p) => { totals[p.id] = 0; });
-  entries.forEach((entry) => {
-    state.players.forEach((p) => {
-      totals[p.id] += entry.scores[p.id] || 0;
-    });
-  });
-  return totals;
 }
 
 function renderSummary() {
   const grid = document.getElementById('summaryGrid');
   const totals = computeTotals(getFilteredEntries());
 
-  if (state.players.length === 0) {
-    grid.innerHTML = '<p class="empty-hint">請先新增決鬥者</p>';
-    return;
-  }
-
-  grid.innerHTML = state.players.map((p) => {
+  grid.innerHTML = FIXED_PLAYERS.map((p) => {
     const t = totals[p.id] || 0;
-    const cls = t > 0 ? 'positive' : t < 0 ? 'negative' : 'zero';
+    const cls = scoreClass(t);
     return `
-      <div class="summary-item">
+      <button type="button" class="summary-item" data-player="${p.id}">
         <div class="avatar">${avatarHTML(p)}</div>
         <div class="name">${escapeHTML(p.name)}</div>
         <div class="total ${cls}">${formatNum(t)}</div>
-      </div>`;
+      </button>`;
   }).join('');
+
+  grid.querySelectorAll('.summary-item').forEach((btn) => {
+    btn.addEventListener('click', () => openPlayerDetail(btn.dataset.player));
+  });
 }
 
 function renderScoreInputs(containerId = 'scoreInputs', prefix = '') {
   const container = document.getElementById(containerId);
   if (!container) return;
 
-  if (state.players.length === 0) {
-    container.innerHTML = '<p class="hint-text">請先到下方新增決鬥者</p>';
-    return;
-  }
-
-  container.innerHTML = state.players.map((p) => `
+  container.innerHTML = FIXED_PLAYERS.map((p) => `
     <div class="score-field">
       <div class="mini-avatar">${avatarHTML(p)}</div>
       <span class="player-name">${escapeHTML(p.name)}</span>
@@ -162,19 +192,13 @@ function renderScoreInputs(containerId = 'scoreInputs', prefix = '') {
   });
 }
 
-function scoreClass(n) {
-  if (n > 0) return 'positive';
-  if (n < 0) return 'negative';
-  return 'zero';
-}
-
 function renderLedger() {
   const head = document.getElementById('ledgerHead');
   const body = document.getElementById('ledgerBody');
   const hint = document.getElementById('emptyHint');
-  const entries = [...state.entries].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+  const entries = [...state.entries].sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
 
-  if (entries.length === 0 || state.players.length === 0) {
+  if (entries.length === 0) {
     head.innerHTML = '';
     body.innerHTML = '';
     hint.style.display = 'block';
@@ -185,7 +209,7 @@ function renderLedger() {
 
   head.innerHTML = `<tr>
     <th>日期</th>
-    ${state.players.map((p) => `<th>${escapeHTML(p.name)}</th>`).join('')}
+    ${FIXED_PLAYERS.map((p) => `<th>${escapeHTML(p.name)}</th>`).join('')}
     <th>+/- 結算</th>
     <th></th>
   </tr>`;
@@ -198,9 +222,9 @@ function renderLedger() {
       <td>
         ${formatDate(entry.date)}
         <span class="type-badge ${type.badge}">${type.short}</span>
-        ${entry.note ? `<span style="color:var(--text-muted);font-size:0.75rem"> ${escapeHTML(entry.note)}</span>` : ''}
+        ${entry.note ? `<span class="note-inline">${escapeHTML(entry.note)}</span>` : ''}
       </td>
-      ${state.players.map((p) => {
+      ${FIXED_PLAYERS.map((p) => {
         const s = entry.scores[p.id] || 0;
         return `<td class="${scoreClass(s)}">${formatNum(s)}</td>`;
       }).join('')}
@@ -220,43 +244,71 @@ function renderLedger() {
   });
 }
 
-function renderPlayers() {
-  const list = document.getElementById('playerList');
-  list.innerHTML = state.players.map((p) => `
-    <div class="player-chip">
-      <div class="avatar">${avatarHTML(p)}</div>
-      <span class="name">${escapeHTML(p.name)}</span>
-      <button class="remove-btn" data-id="${p.id}" title="移除">×</button>
+function renderPlayerDetail(playerId) {
+  const player = getPlayerById(playerId);
+  if (!player) return;
+
+  const { byType, total, history } = computePlayerBreakdown(playerId);
+  const container = document.getElementById('playerDetail');
+
+  const typeRows = GAME_TYPE_ORDER.map((type) => {
+    const value = byType[type] || 0;
+    return `
+      <tr>
+        <td><span class="type-badge ${GAME_TYPES[type].badge}">${GAME_TYPES[type].label}</span></td>
+        <td class="${scoreClass(value)}">${formatNum(value)}</td>
+      </tr>`;
+  }).join('');
+
+  const historyRows = history.length === 0
+    ? '<tr><td colspan="3" class="empty-cell">尚無記錄</td></tr>'
+    : history.map((item) => `
+        <tr>
+          <td>${formatDate(item.date)}</td>
+          <td><span class="type-badge ${GAME_TYPES[item.type].badge}">${GAME_TYPES[item.type].short}</span></td>
+          <td class="${scoreClass(item.score)}">${formatNum(item.score)}</td>
+        </tr>
+      `).join('');
+
+  container.innerHTML = `
+    <div class="player-detail-header">
+      <div class="player-detail-avatar">${avatarHTML(player)}</div>
+      <div>
+        <h3>${escapeHTML(player.name)}</h3>
+        <p class="hint-text">各項目總和與歷史記錄</p>
+      </div>
+      <div class="player-detail-total ${scoreClass(total)}">${formatNum(total)}</div>
     </div>
-  `).join('');
 
-  list.querySelectorAll('.remove-btn').forEach((btn) => {
-    btn.addEventListener('click', () => removePlayer(btn.dataset.id));
-  });
+    <h4 class="detail-section-title">各項目總和</h4>
+    <table class="detail-table">
+      <thead>
+        <tr><th>項目</th><th>總和</th></tr>
+      </thead>
+      <tbody>
+        ${typeRows}
+        <tr class="detail-total-row">
+          <td>總計</td>
+          <td class="${scoreClass(total)}">${formatNum(total)}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h4 class="detail-section-title">歷史記錄</h4>
+    <div class="table-wrap">
+      <table class="detail-table">
+        <thead>
+          <tr><th>日期</th><th>項目</th><th>金額</th></tr>
+        </thead>
+        <tbody>${historyRows}</tbody>
+      </table>
+    </div>
+  `;
 }
 
-function renderEmojiPicker() {
-  const picker = document.getElementById('emojiPicker');
-  picker.innerHTML = EMOJI_OPTIONS.map((e) =>
-    `<button type="button" class="emoji-btn${newPlayerAvatar.type === 'emoji' && newPlayerAvatar.value === e ? ' selected' : ''}" data-emoji="${e}">${e}</button>`
-  ).join('');
-
-  picker.querySelectorAll('.emoji-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      newPlayerAvatar = { type: 'emoji', value: btn.dataset.emoji };
-      updateAvatarPreview();
-      renderEmojiPicker();
-    });
-  });
-}
-
-function updateAvatarPreview() {
-  const preview = document.getElementById('newAvatarPreview');
-  if (newPlayerAvatar.type === 'image') {
-    preview.innerHTML = `<img src="${newPlayerAvatar.value}" alt="">`;
-  } else {
-    preview.innerHTML = `<span>${newPlayerAvatar.value}</span>`;
-  }
+function openPlayerDetail(playerId) {
+  renderPlayerDetail(playerId);
+  document.getElementById('playerDialog').showModal();
 }
 
 function updateBalance(barId, valueId, hintId, btnId, scores) {
@@ -281,11 +333,7 @@ function updateBalance(barId, valueId, hintId, btnId, scores) {
   if (btn) btn.disabled = !balanced;
 }
 
-function escapeHTML(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
+// ── Export / Import ──────────────────────────────────
 
 function buildExportPayload() {
   return {
@@ -306,19 +354,18 @@ function parseImportPayload(text) {
 
 function validateDataShape(data) {
   if (!data || typeof data !== 'object') return '內容不是物件';
-  if (!Array.isArray(data.players) || !Array.isArray(data.entries)) return '缺少 players / entries';
-  for (const p of data.players) {
-    if (!p || typeof p !== 'object') return 'players 格式錯誤';
-    if (typeof p.id !== 'string' || typeof p.name !== 'string') return 'players 欄位不完整';
-  }
+  if (!Array.isArray(data.entries)) return '缺少 entries';
   for (const e of data.entries) {
     if (!e || typeof e !== 'object') return 'entries 格式錯誤';
     if (typeof e.id !== 'string' || typeof e.date !== 'string' || typeof e.type !== 'string') return 'entries 欄位不完整';
     if (!e.scores || typeof e.scores !== 'object') return 'entries.scores 格式錯誤';
     if (!(e.type in GAME_TYPES)) return `未知種類：${e.type}`;
-    // 允許舊備份沒有 createdAt / note
   }
   return null;
+}
+
+function applyImportedData(data) {
+  state = { entries: data.entries };
 }
 
 async function copyTextToClipboard(text) {
@@ -326,7 +373,6 @@ async function copyTextToClipboard(text) {
     await navigator.clipboard.writeText(text);
     return true;
   } catch (_) {
-    // fallback
     const ta = document.createElement('textarea');
     ta.value = text;
     ta.setAttribute('readonly', 'readonly');
@@ -350,7 +396,7 @@ async function copyTextToClipboard(text) {
 
 function getFormScores() {
   const scores = {};
-  state.players.forEach((p) => {
+  FIXED_PLAYERS.forEach((p) => {
     const input = document.getElementById(`score-${p.id}`);
     scores[p.id] = Number(input?.value) || 0;
   });
@@ -359,7 +405,7 @@ function getFormScores() {
 
 function getEditScores() {
   const scores = {};
-  state.players.forEach((p) => {
+  FIXED_PLAYERS.forEach((p) => {
     const input = document.getElementById(`editscore-${p.id}`);
     scores[p.id] = Number(input?.value) || 0;
   });
@@ -383,7 +429,7 @@ function addEntry(e) {
   });
 
   document.getElementById('entryNote').value = '';
-  state.players.forEach((p) => {
+  FIXED_PLAYERS.forEach((p) => {
     const input = document.getElementById(`score-${p.id}`);
     if (input) input.value = '0';
   });
@@ -406,7 +452,7 @@ function openEdit(id) {
   document.getElementById('editType').value = entry.type;
   renderScoreInputs('editScoreInputs', 'edit');
 
-  state.players.forEach((p) => {
+  FIXED_PLAYERS.forEach((p) => {
     const input = document.getElementById(`editscore-${p.id}`);
     if (input) input.value = entry.scores[p.id] || 0;
   });
@@ -429,36 +475,6 @@ function saveEdit(e) {
 
   document.getElementById('editDialog').close();
   editingEntryId = null;
-  saveState();
-}
-
-function addPlayer(e) {
-  e.preventDefault();
-  const name = document.getElementById('newPlayerName').value.trim();
-  if (!name) return;
-
-  state.players.push({
-    id: uid(),
-    name,
-    avatar: { ...newPlayerAvatar },
-  });
-
-  document.getElementById('newPlayerName').value = '';
-  newPlayerAvatar = { type: 'emoji', value: EMOJI_OPTIONS[0] };
-  updateAvatarPreview();
-  renderEmojiPicker();
-  saveState();
-}
-
-function removePlayer(id) {
-  const p = state.players.find((pl) => pl.id === id);
-  if (!p) return;
-  if (!confirm(`確定移除「${p.name}」？其歷史分數會一併清除。`)) return;
-
-  state.players = state.players.filter((pl) => pl.id !== id);
-  state.entries.forEach((entry) => {
-    delete entry.scores[id];
-  });
   saveState();
 }
 
@@ -491,8 +507,8 @@ function importData(file) {
         alert(`備份檔案格式不正確：${err}`);
         return;
       }
-      if (!confirm('匯入會覆蓋現有資料，確定繼續？')) return;
-      state = data;
+      if (!confirm('匯入會覆蓋現有記錄，確定繼續？')) return;
+      applyImportedData(data);
       saveState();
       alert('匯入成功！');
     } catch {
@@ -534,16 +550,16 @@ function confirmPasteImport(e) {
     return;
   }
 
-  if (!confirm('匯入會覆蓋現有資料，確定繼續？')) return;
-  state = data;
+  if (!confirm('匯入會覆蓋現有記錄，確定繼續？')) return;
+  applyImportedData(data);
   closePasteImport();
   saveState();
   alert('匯入成功！');
 }
 
 function clearAll() {
-  if (!confirm('確定清除所有玩家和記錄？此操作無法復原（除非你有備份）。')) return;
-  state = { players: [], entries: [] };
+  if (!confirm('確定清除所有記錄？此操作無法復原（除非你有備份）。')) return;
+  state = { entries: [] };
   saveState();
 }
 
@@ -553,10 +569,12 @@ function init() {
   document.getElementById('entryDate').value = todayISO();
 
   document.getElementById('entryForm').addEventListener('submit', addEntry);
-  document.getElementById('playerForm').addEventListener('submit', addPlayer);
   document.getElementById('editForm').addEventListener('submit', saveEdit);
   document.getElementById('editCancel').addEventListener('click', () => {
     document.getElementById('editDialog').close();
+  });
+  document.getElementById('playerClose').addEventListener('click', () => {
+    document.getElementById('playerDialog').close();
   });
   document.getElementById('filterType').addEventListener('change', render);
   document.getElementById('exportBtn').addEventListener('click', exportData);
@@ -572,26 +590,6 @@ function init() {
   document.getElementById('pasteForm').addEventListener('submit', confirmPasteImport);
   document.getElementById('pasteCancel').addEventListener('click', closePasteImport);
 
-  document.getElementById('newAvatarFile').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      alert('圖片太大，請選擇 5MB 以下的檔案');
-      return;
-    }
-    try {
-      const dataUrl = await compressImage(file);
-      newPlayerAvatar = { type: 'image', value: dataUrl };
-      updateAvatarPreview();
-      renderEmojiPicker();
-    } catch {
-      alert('圖片處理失敗');
-    }
-    e.target.value = '';
-  });
-
-  renderEmojiPicker();
-  updateAvatarPreview();
   render();
 }
 
