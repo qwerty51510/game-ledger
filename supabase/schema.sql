@@ -11,6 +11,9 @@ create table if not exists entries (
 
 alter table entries enable row level security;
 
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on public.entries to anon, authenticated;
+
 create policy "entries_read" on entries for select using (true);
 create policy "entries_insert" on entries for insert with check (true);
 create policy "entries_update" on entries for update using (true);
@@ -24,6 +27,8 @@ create table if not exists player_avatars (
 );
 
 alter table player_avatars enable row level security;
+
+grant select, insert, update, delete on public.player_avatars to anon, authenticated;
 
 create policy "player_avatars_read" on player_avatars for select using (true);
 create policy "player_avatars_insert" on player_avatars for insert with check (true);
