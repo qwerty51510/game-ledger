@@ -116,6 +116,59 @@ function sumScores(scores) {
   return Object.values(scores).reduce((a, b) => a + (Number(b) || 0), 0);
 }
 
+function parseScoreExpression(raw) {
+  const s = String(raw ?? '')
+    .trim()
+    .replace(/\s/g, '')
+    .replace(/[＋﹢]/g, '+')
+    .replace(/[－﹣]/g, '-');
+  if (s === '') return 0;
+
+  let total = 0;
+  let i = 0;
+  while (i < s.length) {
+    let sign = 1;
+    if (s[i] === '+') {
+      i += 1;
+    } else if (s[i] === '-') {
+      sign = -1;
+      i += 1;
+    }
+
+    const start = i;
+    if (s[i] === '.') return NaN;
+    while (i < s.length && /\d/.test(s[i])) i += 1;
+    if (i < s.length && s[i] === '.') {
+      i += 1;
+      while (i < s.length && /\d/.test(s[i])) i += 1;
+    }
+    if (start === i) return NaN;
+
+    const num = Number(s.slice(start, i));
+    if (Number.isNaN(num)) return NaN;
+    total += sign * num;
+  }
+
+  return total;
+}
+
+function readScoreInputs(prefix = '') {
+  const scores = {};
+  let valid = true;
+  FIXED_PLAYERS.forEach((p) => {
+    const input = document.getElementById(`${prefix}score-${p.id}`);
+    const parsed = parseScoreExpression(input?.value);
+    if (Number.isNaN(parsed)) valid = false;
+    scores[p.id] = Number.isNaN(parsed) ? 0 : parsed;
+  });
+  return { scores, valid };
+}
+
+function normalizeScoreInput(input) {
+  const parsed = parseScoreExpression(input.value);
+  if (!Number.isNaN(parsed)) input.value = String(parsed);
+}
+
 function scoreClass(n) {
   if (n > 0) return 'positive';
   if (n < 0) return 'negative';
@@ -203,7 +256,7 @@ function render() {
   renderSummary();
   renderScoreInputs();
   renderLedger();
-  updateBalance('balanceBar', 'balanceValue', 'balanceHint', 'submitBtn', getFormScores());
+  updateBalance('balanceBar', 'balanceValue', 'balanceHint', 'submitBtn', readScoreInputs(''));
 }
 
 function renderSummary() {
@@ -236,18 +289,23 @@ function renderScoreInputs(containerId = 'scoreInputs', prefix = '') {
         <div class="mini-avatar">${avatarHTML(p)}</div>
         <span class="player-name">${escapeHTML(p.name)}</span>
       </div>
-      <input type="number" step="any" data-player="${p.id}" id="${prefix}score-${p.id}"
-        placeholder="0" value="0">
+      <input type="text" inputmode="decimal" class="score-input" data-player="${p.id}" id="${prefix}score-${p.id}"
+        placeholder="0" value="0" autocomplete="off">
     </div>
   `).join('');
 
-  container.querySelectorAll('input[type="number"]').forEach((input) => {
-    input.addEventListener('input', () => {
+  container.querySelectorAll('.score-input').forEach((input) => {
+    const refresh = () => {
       if (containerId === 'scoreInputs') {
-        updateBalance('balanceBar', 'balanceValue', 'balanceHint', 'submitBtn', getFormScores());
+        updateBalance('balanceBar', 'balanceValue', 'balanceHint', 'submitBtn', readScoreInputs(''));
       } else {
-        updateBalance('editBalanceBar', 'editBalanceValue', 'editBalanceHint', 'editSave', getEditScores());
+        updateBalance('editBalanceBar', 'editBalanceValue', 'editBalanceHint', 'editSave', readScoreInputs('edit'));
       }
+    };
+    input.addEventListener('input', refresh);
+    input.addEventListener('blur', () => {
+      normalizeScoreInput(input);
+      refresh();
     });
   });
 }
@@ -412,7 +470,8 @@ async function handleAvatarUpload(playerId, file) {
   }
 }
 
-function updateBalance(barId, valueId, hintId, btnId, scores) {
+function updateBalance(barId, valueId, hintId, btnId, result) {
+  const { scores, valid } = result.scores ? result : { scores: result, valid: true };
   const sum = sumScores(scores);
   const bar = document.getElementById(barId);
   const valueEl = document.getElementById(valueId);
@@ -420,12 +479,14 @@ function updateBalance(barId, valueId, hintId, btnId, scores) {
   const btn = document.getElementById(btnId);
 
   valueEl.textContent = formatNum(sum);
-  const balanced = sum === 0;
+  const balanced = valid && sum === 0;
 
   bar.classList.toggle('balanced', balanced);
   bar.classList.toggle('unbalanced', !balanced);
 
-  if (balanced) {
+  if (!valid) {
+    hintEl.textContent = '✗ 算式格式不正確';
+  } else if (balanced) {
     hintEl.textContent = '✓ 平衡，可以儲存';
   } else {
     hintEl.textContent = `✗ 差 ${formatNum(sum)}，必須等於 0`;
@@ -550,21 +611,11 @@ async function copyTextToClipboard(text) {
 // ── Form helpers ─────────────────────────────────────
 
 function getFormScores() {
-  const scores = {};
-  FIXED_PLAYERS.forEach((p) => {
-    const input = document.getElementById(`score-${p.id}`);
-    scores[p.id] = Number(input?.value) || 0;
-  });
-  return scores;
+  return readScoreInputs('').scores;
 }
 
 function getEditScores() {
-  const scores = {};
-  FIXED_PLAYERS.forEach((p) => {
-    const input = document.getElementById(`editscore-${p.id}`);
-    scores[p.id] = Number(input?.value) || 0;
-  });
-  return scores;
+  return readScoreInputs('edit').scores;
 }
 
 // ── Cloud sync ───────────────────────────────────────
@@ -627,7 +678,11 @@ function startAutoRefresh() {
 
 async function addEntry(e) {
   e.preventDefault();
-  const scores = getFormScores();
+  const { scores, valid } = readScoreInputs('');
+  if (!valid) {
+    alert('請檢查分數算式格式');
+    return;
+  }
   if (sumScores(scores) !== 0) return;
 
   const entry = {
@@ -656,7 +711,7 @@ async function addEntry(e) {
     updateSyncBar('error', `同步失敗：${error.message}`);
   } finally {
     submitBtn.disabled = false;
-    updateBalance('balanceBar', 'balanceValue', 'balanceHint', 'submitBtn', getFormScores());
+    updateBalance('balanceBar', 'balanceValue', 'balanceHint', 'submitBtn', readScoreInputs(''));
   }
 }
 
@@ -687,13 +742,17 @@ function openEdit(id) {
     if (input) input.value = entry.scores[p.id] || 0;
   });
 
-  updateBalance('editBalanceBar', 'editBalanceValue', 'editBalanceHint', 'editSave', getEditScores());
+  updateBalance('editBalanceBar', 'editBalanceValue', 'editBalanceHint', 'editSave', readScoreInputs('edit'));
   document.getElementById('editDialog').showModal();
 }
 
 async function saveEdit(e) {
   e.preventDefault();
-  const scores = getEditScores();
+  const { scores, valid } = readScoreInputs('edit');
+  if (!valid) {
+    alert('請檢查分數算式格式');
+    return;
+  }
   if (sumScores(scores) !== 0) return;
 
   const entry = state.entries.find((item) => item.id === editingEntryId);
