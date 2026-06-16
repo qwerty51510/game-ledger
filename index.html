@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>決鬥帳本</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>決鬥帳本</h1>
+      <p class="subtitle">零和記帳 · 誰贏誰輸加總必為 0</p>
+    </header>
+
+    <!-- 總覽 -->
+    <section class="card summary-card">
+      <div class="card-header">
+        <h2>總和</h2>
+        <div class="filter-bar">
+          <label>篩選種類</label>
+          <select id="filterType">
+            <option value="all">全部</option>
+            <option value="poker">德州扑克</option>
+            <option value="mahjong">麻将</option>
+            <option value="sports">体育</option>
+          </select>
+        </div>
+      </div>
+      <div id="summaryGrid" class="summary-grid"></div>
+    </section>
+
+    <!-- 新增記錄 -->
+    <section class="card">
+      <h2>新增記錄</h2>
+      <form id="entryForm" class="entry-form">
+        <div class="form-row">
+          <div class="field">
+            <label for="entryDate">日期</label>
+            <input type="date" id="entryDate" required>
+          </div>
+          <div class="field">
+            <label for="entryType">種類</label>
+            <select id="entryType" required>
+              <option value="poker">德州扑克</option>
+              <option value="mahjong">麻将</option>
+              <option value="sports">体育</option>
+            </select>
+          </div>
+          <div class="field field-note">
+            <label for="entryNote">備註（選填）</label>
+            <input type="text" id="entryNote" placeholder="例如：週二局">
+          </div>
+        </div>
+
+        <div id="scoreInputs" class="score-inputs"></div>
+
+        <div class="balance-bar" id="balanceBar">
+          <span class="balance-label">結算驗證</span>
+          <span class="balance-value" id="balanceValue">0</span>
+          <span class="balance-hint" id="balanceHint">✓ 平衡，可以儲存</span>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="submitBtn">儲存記錄</button>
+      </form>
+    </section>
+
+    <!-- 歷史記錄 -->
+    <section class="card">
+      <div class="card-header">
+        <h2>歷史記錄</h2>
+        <button type="button" class="btn btn-ghost" id="exportBtn">匯出備份</button>
+      </div>
+      <div class="table-wrap">
+        <table class="ledger-table" id="ledgerTable">
+          <thead id="ledgerHead"></thead>
+          <tbody id="ledgerBody"></tbody>
+        </table>
+      </div>
+      <p class="empty-hint" id="emptyHint">尚無記錄，請先新增一筆。</p>
+    </section>
+
+    <!-- 玩家管理 -->
+    <section class="card">
+      <div class="card-header">
+        <h2>決鬥者管理</h2>
+      </div>
+      <p class="hint-text">頭像會存在你的瀏覽器本機，不需要伺服器。也可以選 emoji 當頭像。</p>
+
+      <div id="playerList" class="player-list"></div>
+
+      <form id="playerForm" class="player-form">
+        <div class="avatar-picker">
+          <div class="avatar-preview" id="newAvatarPreview">
+            <span class="avatar-initial">?</span>
+          </div>
+          <div class="avatar-options">
+            <label class="btn btn-ghost btn-sm">
+              上傳圖片
+              <input type="file" id="newAvatarFile" accept="image/*" hidden>
+            </label>
+            <div class="emoji-picker" id="emojiPicker"></div>
+          </div>
+        </div>
+        <input type="text" id="newPlayerName" placeholder="輸入名字" required maxlength="20">
+        <button type="submit" class="btn btn-primary">新增決鬥者</button>
+      </form>
+    </section>
+
+    <footer class="footer">
+      <label class="btn btn-ghost btn-sm">
+        匯入備份
+        <input type="file" id="importFile" accept=".json" hidden>
+      </label>
+      <button type="button" class="btn btn-ghost btn-sm btn-danger" id="clearBtn">清除所有資料</button>
+    </footer>
+  </div>
+
+  <!-- 編輯 Modal -->
+  <dialog id="editDialog" class="modal">
+    <form id="editForm" method="dialog">
+      <h3>編輯記錄</h3>
+      <div class="form-row">
+        <div class="field">
+          <label for="editDate">日期</label>
+          <input type="date" id="editDate" required>
+        </div>
+        <div class="field">
+          <label for="editType">種類</label>
+          <select id="editType" required>
+            <option value="poker">德州扑克</option>
+            <option value="mahjong">麻将</option>
+            <option value="sports">体育</option>
+          </select>
+        </div>
+      </div>
+      <div id="editScoreInputs" class="score-inputs"></div>
+      <div class="balance-bar" id="editBalanceBar">
+        <span class="balance-label">結算驗證</span>
+        <span class="balance-value" id="editBalanceValue">0</span>
+        <span class="balance-hint" id="editBalanceHint"></span>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="editCancel">取消</button>
+        <button type="submit" class="btn btn-primary" id="editSave">儲存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
