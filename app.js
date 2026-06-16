@@ -1,4 +1,7 @@
 const STORAGE_KEY = 'game-ledger-data';
+const SCORE_DRAFT_KEY = 'game-ledger-score-draft';
+const SCORE_DRAFT_CLEAR_AT_KEY = 'game-ledger-draft-clear-at';
+const SCORE_DRAFT_CLEAR_MS = 2 * 60 * 1000;
 const EXPORT_SCHEMA_VERSION = 2;
 
 const GAME_TYPES = {
@@ -25,6 +28,8 @@ let cloudAvatars = {};
 let editingEntryId = null;
 let refreshTimer = null;
 let currentDetailPlayerId = null;
+let scoreDraft = loadScoreDraft();
+let scoreDraftClearTimer = null;
 
 // ── Storage ──────────────────────────────────────────
 
@@ -41,6 +46,71 @@ function loadState() {
 
 function saveStateLocal() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function loadScoreDraft() {
+  try {
+    const raw = localStorage.getItem(SCORE_DRAFT_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed?.values && typeof parsed.values === 'object' ? parsed.values : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function persistScoreDraft() {
+  localStorage.setItem(SCORE_DRAFT_KEY, JSON.stringify({
+    values: scoreDraft,
+    updatedAt: Date.now(),
+  }));
+}
+
+function captureScoreDraftFromDOM() {
+  FIXED_PLAYERS.forEach((p) => {
+    const input = document.getElementById(`score-${p.id}`);
+    if (input) scoreDraft[p.id] = input.value;
+  });
+  persistScoreDraft();
+}
+
+function getScoreDraftValue(playerId) {
+  const value = scoreDraft[playerId];
+  if (value === undefined || value === null || value === '') return '0';
+  return String(value);
+}
+
+function updateScoreDraft(playerId, value) {
+  scoreDraft[playerId] = value;
+  persistScoreDraft();
+}
+
+function clearScoreDraftNow() {
+  scoreDraft = {};
+  scoreDraftClearTimer = null;
+  localStorage.removeItem(SCORE_DRAFT_KEY);
+  localStorage.removeItem(SCORE_DRAFT_CLEAR_AT_KEY);
+  renderScoreInputs();
+  updateBalance('balanceBar', 'balanceValue', 'balanceHint', 'submitBtn', readScoreInputs(''));
+}
+
+function scheduleScoreDraftClear() {
+  const clearAt = Date.now() + SCORE_DRAFT_CLEAR_MS;
+  localStorage.setItem(SCORE_DRAFT_CLEAR_AT_KEY, String(clearAt));
+  if (scoreDraftClearTimer) clearTimeout(scoreDraftClearTimer);
+  scoreDraftClearTimer = setTimeout(clearScoreDraftNow, SCORE_DRAFT_CLEAR_MS);
+}
+
+function restoreScoreDraftClearTimer() {
+  const raw = localStorage.getItem(SCORE_DRAFT_CLEAR_AT_KEY);
+  if (!raw) return;
+  const remaining = Number(raw) - Date.now();
+  if (remaining <= 0) {
+    clearScoreDraftNow();
+    return;
+  }
+  if (scoreDraftClearTimer) clearTimeout(scoreDraftClearTimer);
+  scoreDraftClearTimer = setTimeout(clearScoreDraftNow, remaining);
 }
 
 function saveState() {
@@ -253,6 +323,7 @@ function computePlayerBreakdown(playerId) {
 // ── Render ───────────────────────────────────────────
 
 function render() {
+  captureScoreDraftFromDOM();
   renderSummary();
   renderScoreInputs();
   renderLedger();
@@ -283,20 +354,23 @@ function renderScoreInputs(containerId = 'scoreInputs', prefix = '') {
   const container = document.getElementById(containerId);
   if (!container) return;
 
-  container.innerHTML = getPlayers().map((p) => `
+  container.innerHTML = getPlayers().map((p) => {
+    const initialValue = prefix ? '0' : escapeHTML(getScoreDraftValue(p.id));
+    return `
     <div class="score-field">
       <div class="score-field-header">
         <div class="mini-avatar">${avatarHTML(p)}</div>
         <span class="player-name">${escapeHTML(p.name)}</span>
       </div>
       <input type="text" inputmode="decimal" class="score-input" data-player="${p.id}" id="${prefix}score-${p.id}"
-        placeholder="0" value="0" autocomplete="off">
-    </div>
-  `).join('');
+        placeholder="0" value="${initialValue}" autocomplete="off">
+    </div>`;
+  }).join('');
 
   container.querySelectorAll('.score-input').forEach((input) => {
     const refresh = () => {
       if (containerId === 'scoreInputs') {
+        updateScoreDraft(input.dataset.player, input.value);
         updateBalance('balanceBar', 'balanceValue', 'balanceHint', 'submitBtn', readScoreInputs(''));
       } else {
         updateBalance('editBalanceBar', 'editBalanceValue', 'editBalanceHint', 'editSave', readScoreInputs('edit'));
@@ -305,6 +379,7 @@ function renderScoreInputs(containerId = 'scoreInputs', prefix = '') {
     input.addEventListener('input', refresh);
     input.addEventListener('blur', () => {
       normalizeScoreInput(input);
+      if (containerId === 'scoreInputs') updateScoreDraft(input.dataset.player, input.value);
       refresh();
     });
   });
@@ -700,11 +775,11 @@ async function addEntry(e) {
     if (isCloudSync()) await Sync.upsertEntry(entry);
     state.entries.push(entry);
     document.getElementById('entryNote').value = '';
-    FIXED_PLAYERS.forEach((p) => {
-      const input = document.getElementById(`score-${p.id}`);
-      if (input) input.value = '0';
-    });
-    saveState();
+    captureScoreDraftFromDOM();
+    scheduleScoreDraftClear();
+    saveStateLocal();
+    renderSummary();
+    renderLedger();
     updateSyncBar('ok');
   } catch (error) {
     alert(`儲存失敗：${error.message}`);
@@ -875,6 +950,7 @@ async function init() {
 
   render();
   updateSyncBar();
+  restoreScoreDraftClearTimer();
 
   if (isCloudSync()) {
     if (Sync.getConfig().syncMode === 'supabase' && !window.supabase?.createClient) {
