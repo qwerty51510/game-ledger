@@ -4,6 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>決鬥帳本</title>
+  <script>
+    (function () {
+      const path = location.pathname;
+      if (path.includes('/game-ledger')) {
+        const base = document.createElement('base');
+        base.href = location.origin + '/game-ledger/';
+        document.head.prepend(base);
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>

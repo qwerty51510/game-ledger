@@ -85,9 +85,28 @@ function escapeHTML(str) {
   return div.innerHTML;
 }
 
+function resolveAssetUrl(path) {
+  if (!path) return null;
+  if (/^(https?:|data:)/i.test(path)) return path;
+  try {
+    return new URL(path, window.location.href).href;
+  } catch {
+    return path;
+  }
+}
+
+function avatarFallback(img) {
+  const span = document.createElement('span');
+  span.className = 'avatar-initial';
+  span.textContent = img.dataset.fallback || '?';
+  img.replaceWith(span);
+}
+
 function avatarHTML(player) {
   if (player.avatar) {
-    return `<img src="${player.avatar}" alt="${escapeHTML(player.name)}">`;
+    const src = resolveAssetUrl(player.avatar);
+    const initial = escapeHTML(player.name.charAt(0));
+    return `<img src="${src}" alt="${escapeHTML(player.name)}" class="avatar-img" data-fallback="${initial}" onerror="avatarFallback(this)">`;
   }
   return `<span class="avatar-initial">${escapeHTML(player.name.charAt(0))}</span>`;
 }
