@@ -3,22 +3,22 @@ const SCORE_DRAFT_KEY = 'game-ledger-score-draft';
 const EXPORT_SCHEMA_VERSION = 2;
 
 const GAME_TYPES = {
-  poker: { label: '德州扑克', short: '德', badge: 'poker' },
-  mahjong: { label: '麻将', short: '麻', badge: 'mahjong' },
-  sports: { label: '体育', short: '体', badge: 'sports' },
+  poker: { label: '德州撲克', short: '德', badge: 'poker' },
+  mahjong: { label: '麻將', short: '麻', badge: 'mahjong' },
+  sports: { label: '體育', short: '體', badge: 'sports' },
 };
 
 const GAME_TYPE_ORDER = ['poker', 'mahjong', 'sports'];
 
 // 固定參賽者；avatar 預設值可被雲端頭像覆蓋
 const FIXED_PLAYERS = [
-  { id: 'oli', name: '奥利', avatar: null },
+  { id: 'oli', name: '奧利', avatar: null },
   { id: 'dabai', name: '大白', avatar: 'avatars/dabai.png' },
   { id: 'finn', name: '芬恩', avatar: 'avatars/finn.png' },
-  { id: 'kevin', name: '凯文', avatar: null },
+  { id: 'kevin', name: '凱文', avatar: null },
   { id: 'anderson', name: '安德森', avatar: null },
   { id: 'tang', name: '唐', avatar: 'avatars/tang.jpg' },
-  { id: 'allen', name: '艾伦', avatar: 'avatars/allen.png' },
+  { id: 'allen', name: '艾倫', avatar: 'avatars/allen.png' },
 ];
 
 let state = loadState();
@@ -331,8 +331,11 @@ function renderScoreInputs(containerId = 'scoreInputs', prefix = '') {
         <div class="mini-avatar">${avatarHTML(p)}</div>
         <span class="player-name">${escapeHTML(p.name)}</span>
       </div>
-      <input type="text" inputmode="decimal" class="score-input" data-player="${p.id}" id="${prefix}score-${p.id}"
-        placeholder="0" value="${initialValue}" autocomplete="off">
+      <div class="score-field-input-row">
+        <input type="text" inputmode="decimal" class="score-input" data-player="${p.id}" id="${prefix}score-${p.id}"
+          placeholder="0" value="${initialValue}" autocomplete="off">
+        <button type="button" class="btn btn-ghost btn-sm score-clear-btn" data-player="${p.id}">清空</button>
+      </div>
     </div>`;
   }).join('');
 
@@ -350,6 +353,21 @@ function renderScoreInputs(containerId = 'scoreInputs', prefix = '') {
       normalizeScoreInput(input);
       if (containerId === 'scoreInputs') updateScoreDraft(input.dataset.player, input.value);
       refresh();
+    });
+  });
+
+  container.querySelectorAll('.score-clear-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const playerId = btn.dataset.player;
+      const input = document.getElementById(`${prefix}score-${playerId}`);
+      if (!input) return;
+      input.value = '0';
+      if (containerId === 'scoreInputs') updateScoreDraft(playerId, '0');
+      if (containerId === 'scoreInputs') {
+        updateBalance('balanceBar', 'balanceValue', 'balanceHint', 'submitBtn', readScoreInputs(''));
+      } else {
+        updateBalance('editBalanceBar', 'editBalanceValue', 'editBalanceHint', 'editSave', readScoreInputs('edit'));
+      }
     });
   });
 }
