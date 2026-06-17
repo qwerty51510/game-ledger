@@ -331,11 +331,8 @@ function renderScoreInputs(containerId = 'scoreInputs', prefix = '') {
         <div class="mini-avatar">${avatarHTML(p)}</div>
         <span class="player-name">${escapeHTML(p.name)}</span>
       </div>
-      <div class="score-field-input-row">
-        <input type="text" inputmode="decimal" class="score-input" data-player="${p.id}" id="${prefix}score-${p.id}"
-          placeholder="0" value="${initialValue}" autocomplete="off">
-        <button type="button" class="btn btn-ghost btn-sm score-clear-btn" data-player="${p.id}">清空</button>
-      </div>
+      <input type="text" inputmode="decimal" class="score-input" data-player="${p.id}" id="${prefix}score-${p.id}"
+        placeholder="0" value="${initialValue}" autocomplete="off">
     </div>`;
   }).join('');
 
@@ -355,21 +352,19 @@ function renderScoreInputs(containerId = 'scoreInputs', prefix = '') {
       refresh();
     });
   });
+}
 
-  container.querySelectorAll('.score-clear-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const playerId = btn.dataset.player;
-      const input = document.getElementById(`${prefix}score-${playerId}`);
-      if (!input) return;
-      input.value = '0';
-      if (containerId === 'scoreInputs') updateScoreDraft(playerId, '0');
-      if (containerId === 'scoreInputs') {
-        updateBalance('balanceBar', 'balanceValue', 'balanceHint', 'submitBtn', readScoreInputs(''));
-      } else {
-        updateBalance('editBalanceBar', 'editBalanceValue', 'editBalanceHint', 'editSave', readScoreInputs('edit'));
-      }
-    });
+function clearAllScoreInputs(prefix = '') {
+  FIXED_PLAYERS.forEach((p) => {
+    const input = document.getElementById(`${prefix}score-${p.id}`);
+    if (input) input.value = '0';
+    if (!prefix) updateScoreDraft(p.id, '0');
   });
+  if (!prefix) {
+    updateBalance('balanceBar', 'balanceValue', 'balanceHint', 'submitBtn', readScoreInputs(''));
+  } else {
+    updateBalance('editBalanceBar', 'editBalanceValue', 'editBalanceHint', 'editSave', readScoreInputs('edit'));
+  }
 }
 
 function renderLedger() {
@@ -903,6 +898,7 @@ async function init() {
   document.getElementById('entryDate').value = todayISO();
 
   document.getElementById('entryForm').addEventListener('submit', addEntry);
+  document.getElementById('clearAllScoresBtn').addEventListener('click', () => clearAllScoreInputs(''));
   document.getElementById('editForm').addEventListener('submit', saveEdit);
   document.getElementById('editCancel').addEventListener('click', () => {
     document.getElementById('editDialog').close();

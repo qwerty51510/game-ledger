@@ -191,6 +191,13 @@ body {
   margin-bottom: 16px;
 }
 
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -291,25 +298,6 @@ input[type="number"] {
   flex: 1;
   line-height: 1.3;
   word-break: keep-all;
-}
-
-.score-field-input-row {
-  display: flex;
-  gap: 8px;
-  align-items: stretch;
-}
-
-.score-field-input-row .score-input {
-  flex: 1;
-  min-width: 0;
-}
-
-.score-clear-btn {
-  flex-shrink: 0;
-  align-self: center;
-  padding: 8px 10px;
-  font-size: 0.8rem;
-  white-space: nowrap;
 }
 
 .score-field input {

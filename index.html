@@ -14,7 +14,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="styles.css?v=9">
+  <link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
   <div class="app">
@@ -76,7 +76,10 @@
           <span class="balance-hint" id="balanceHint">✓ 平衡，可以儲存</span>
         </div>
 
-        <button type="submit" class="btn btn-primary" id="submitBtn">儲存記錄</button>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="submitBtn">儲存記錄</button>
+          <button type="button" class="btn btn-ghost" id="clearAllScoresBtn">全面清空</button>
+        </div>
       </form>
     </section>
 
@@ -170,6 +173,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js?v=3"></script>
   <script src="sync.js?v=3"></script>
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>
