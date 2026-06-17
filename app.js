@@ -1,7 +1,5 @@
 const STORAGE_KEY = 'game-ledger-data';
 const SCORE_DRAFT_KEY = 'game-ledger-score-draft';
-const SCORE_DRAFT_CLEAR_AT_KEY = 'game-ledger-draft-clear-at';
-const SCORE_DRAFT_CLEAR_MS = 2 * 60 * 1000;
 const EXPORT_SCHEMA_VERSION = 2;
 
 const GAME_TYPES = {
@@ -29,7 +27,6 @@ let editingEntryId = null;
 let refreshTimer = null;
 let currentDetailPlayerId = null;
 let scoreDraft = loadScoreDraft();
-let scoreDraftClearTimer = null;
 
 // ── Storage ──────────────────────────────────────────
 
@@ -83,34 +80,6 @@ function getScoreDraftValue(playerId) {
 function updateScoreDraft(playerId, value) {
   scoreDraft[playerId] = value;
   persistScoreDraft();
-}
-
-function clearScoreDraftNow() {
-  scoreDraft = {};
-  scoreDraftClearTimer = null;
-  localStorage.removeItem(SCORE_DRAFT_KEY);
-  localStorage.removeItem(SCORE_DRAFT_CLEAR_AT_KEY);
-  renderScoreInputs();
-  updateBalance('balanceBar', 'balanceValue', 'balanceHint', 'submitBtn', readScoreInputs(''));
-}
-
-function scheduleScoreDraftClear() {
-  const clearAt = Date.now() + SCORE_DRAFT_CLEAR_MS;
-  localStorage.setItem(SCORE_DRAFT_CLEAR_AT_KEY, String(clearAt));
-  if (scoreDraftClearTimer) clearTimeout(scoreDraftClearTimer);
-  scoreDraftClearTimer = setTimeout(clearScoreDraftNow, SCORE_DRAFT_CLEAR_MS);
-}
-
-function restoreScoreDraftClearTimer() {
-  const raw = localStorage.getItem(SCORE_DRAFT_CLEAR_AT_KEY);
-  if (!raw) return;
-  const remaining = Number(raw) - Date.now();
-  if (remaining <= 0) {
-    clearScoreDraftNow();
-    return;
-  }
-  if (scoreDraftClearTimer) clearTimeout(scoreDraftClearTimer);
-  scoreDraftClearTimer = setTimeout(clearScoreDraftNow, remaining);
 }
 
 function saveState() {
@@ -776,7 +745,6 @@ async function addEntry(e) {
     state.entries.push(entry);
     document.getElementById('entryNote').value = '';
     captureScoreDraftFromDOM();
-    scheduleScoreDraftClear();
     saveStateLocal();
     renderSummary();
     renderLedger();
@@ -950,7 +918,7 @@ async function init() {
 
   render();
   updateSyncBar();
-  restoreScoreDraftClearTimer();
+  localStorage.removeItem('game-ledger-draft-clear-at');
 
   if (isCloudSync()) {
     if (Sync.getConfig().syncMode === 'supabase' && !window.supabase?.createClient) {
