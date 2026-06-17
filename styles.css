@@ -194,8 +194,15 @@ body {
 .form-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
+  margin-top: 4px;
+}
+
+.btn-clear-all {
+  min-width: 120px;
+  padding: 10px 22px;
+  font-size: 0.95rem;
 }
 
 .field {

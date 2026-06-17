@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>決鬥帳本</title>
   <script>
     (function () {
@@ -14,7 +17,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="styles.css?v=10">
+  <link rel="stylesheet" href="styles.css?v=20">
 </head>
 <body>
   <div class="app">
@@ -78,7 +81,7 @@
 
         <div class="form-actions">
           <button type="submit" class="btn btn-primary" id="submitBtn">儲存記錄</button>
-          <button type="button" class="btn btn-ghost" id="clearAllScoresBtn">全面清空</button>
+          <button type="button" class="btn btn-ghost btn-danger btn-clear-all" id="clearAllScoresBtn">全面清空</button>
         </div>
       </form>
     </section>
@@ -171,8 +174,8 @@
   </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=3"></script>
-  <script src="sync.js?v=3"></script>
-  <script src="app.js?v=13"></script>
+  <script src="config.js?v=20"></script>
+  <script src="sync.js?v=20"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>
