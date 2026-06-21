@@ -101,11 +101,15 @@ body {
   margin-bottom: 16px;
 }
 
-.card-header-actions {
+.card-header-left {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
+}
+
+.card-header-left h2 {
+  margin-bottom: 0;
 }
 
 .filter-bar {
