@@ -17,7 +17,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="styles.css?v=20">
+  <link rel="stylesheet" href="styles.css?v=21">
 </head>
 <body>
   <div class="app">
@@ -90,15 +90,19 @@
     <section class="card">
       <div class="card-header">
         <h2>歷史記錄</h2>
-        <div class="btn-group">
+        <div class="card-header-actions">
+          <div class="filter-bar">
+            <label for="ledgerFilterType">篩選種類</label>
+            <select id="ledgerFilterType">
+              <option value="all">全部</option>
+              <option value="poker">德州撲克</option>
+              <option value="mahjong">麻將</option>
+              <option value="sports">體育</option>
+            </select>
+          </div>
           <button type="button" class="btn btn-ghost" id="exportBtn">下載備份</button>
-          <button type="button" class="btn btn-ghost" id="copyExportBtn">複製備份文字</button>
-          <button type="button" class="btn btn-ghost" id="pasteImportBtn">貼上合併匯入</button>
         </div>
       </div>
-      <p class="hint-text sync-hint" id="syncHint">
-        <strong>多人記帳：</strong>每人記完後點「複製備份文字」貼到群組 → 其他人用「合併匯入」同步（不會蓋掉自己記的）。
-      </p>
       <div class="table-wrap">
         <table class="ledger-table" id="ledgerTable">
           <thead id="ledgerHead"></thead>
@@ -106,6 +110,7 @@
         </table>
       </div>
       <p class="empty-hint" id="emptyHint">尚無記錄，請先新增一筆。</p>
+      <p class="empty-hint" id="emptyFilterHint" hidden>此篩選條件下尚無記錄。</p>
     </section>
 
     <footer class="footer">
@@ -157,25 +162,9 @@
     </div>
   </dialog>
 
-  <!-- 貼上匯入 Modal -->
-  <dialog id="pasteDialog" class="modal">
-    <form id="pasteForm" method="dialog">
-      <h3>貼上合併匯入</h3>
-      <p class="hint-text" style="margin-bottom: 12px;">
-        貼上群組裡的備份文字。<strong>合併匯入</strong>會保留你本地記錄，並加入別人新增的項目。
-      </p>
-      <textarea id="pasteTextarea" class="paste-textarea" rows="10" placeholder="在這裡貼上 JSON..."></textarea>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-ghost" id="pasteCancel">取消</button>
-        <button type="button" class="btn btn-ghost" id="pasteOverwrite">覆蓋匯入</button>
-        <button type="submit" class="btn btn-primary" id="pasteConfirm">合併匯入</button>
-      </div>
-    </form>
-  </dialog>
-
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=20"></script>
-  <script src="sync.js?v=20"></script>
-  <script src="app.js?v=20"></script>
+  <script src="config.js?v=21"></script>
+  <script src="sync.js?v=21"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>

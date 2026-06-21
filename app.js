@@ -254,6 +254,12 @@ function getFilteredEntries() {
   return state.entries.filter((e) => e.type === filter);
 }
 
+function getLedgerFilteredEntries() {
+  const filter = document.getElementById('ledgerFilterType')?.value || 'all';
+  if (filter === 'all') return state.entries;
+  return state.entries.filter((e) => e.type === filter);
+}
+
 function computeTotals(entries, playerId = null) {
   const totals = {};
   FIXED_PLAYERS.forEach((p) => { totals[p.id] = 0; });
@@ -371,16 +377,31 @@ function renderLedger() {
   const head = document.getElementById('ledgerHead');
   const body = document.getElementById('ledgerBody');
   const hint = document.getElementById('emptyHint');
-  const entries = [...state.entries].sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+  const filterHint = document.getElementById('emptyFilterHint');
+  const tableWrap = document.querySelector('.table-wrap');
+  const entries = [...getLedgerFilteredEntries()].sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+
+  if (state.entries.length === 0) {
+    head.innerHTML = '';
+    body.innerHTML = '';
+    hint.style.display = 'block';
+    if (filterHint) filterHint.hidden = true;
+    if (tableWrap) tableWrap.style.display = 'none';
+    return;
+  }
 
   if (entries.length === 0) {
     head.innerHTML = '';
     body.innerHTML = '';
-    hint.style.display = 'block';
+    hint.style.display = 'none';
+    if (filterHint) filterHint.hidden = false;
+    if (tableWrap) tableWrap.style.display = 'none';
     return;
   }
 
   hint.style.display = 'none';
+  if (filterHint) filterHint.hidden = true;
+  if (tableWrap) tableWrap.style.display = '';
 
   head.innerHTML = `<tr>
     <th>日期</th>
@@ -641,30 +662,6 @@ function processImport(data, mode) {
   });
 }
 
-async function copyTextToClipboard(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch (_) {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.setAttribute('readonly', 'readonly');
-    ta.style.position = 'fixed';
-    ta.style.top = '-9999px';
-    document.body.appendChild(ta);
-    ta.focus();
-    ta.select();
-    let ok = false;
-    try {
-      ok = document.execCommand('copy');
-    } catch (_) {
-      ok = false;
-    }
-    document.body.removeChild(ta);
-    return ok;
-  }
-}
-
 // ── Form helpers ─────────────────────────────────────
 
 function getFormScores() {
@@ -681,7 +678,6 @@ function updateSyncBar(status = 'idle', message = '') {
   const bar = document.getElementById('syncBar');
   const text = document.getElementById('syncStatus');
   const refreshBtn = document.getElementById('refreshBtn');
-  const syncHint = document.getElementById('syncHint');
   if (!bar || !text) return;
 
   bar.classList.remove('sync-ok', 'sync-error', 'sync-loading');
@@ -700,9 +696,6 @@ function updateSyncBar(status = 'idle', message = '') {
   }
 
   if (refreshBtn) refreshBtn.hidden = !isCloudSync();
-  if (syncHint) {
-    syncHint.hidden = isCloudSync();
-  }
 }
 
 async function refreshFromRemote() {
@@ -841,14 +834,6 @@ function exportData() {
   URL.revokeObjectURL(url);
 }
 
-async function copyExportText() {
-  const payload = buildExportPayload();
-  const text = JSON.stringify(payload);
-  const ok = await copyTextToClipboard(text);
-  if (ok) alert('已複製！貼到群組後，其他人用「合併匯入」即可同步，不會蓋掉各自記的帳。');
-  else alert('複製失敗：請改用「下載備份」檔案分享。');
-}
-
 function importData(file, mode = 'merge') {
   const reader = new FileReader();
   reader.onload = async (e) => {
@@ -860,36 +845,6 @@ function importData(file, mode = 'merge') {
     }
   };
   reader.readAsText(file);
-}
-
-function openPasteImport() {
-  const dialog = document.getElementById('pasteDialog');
-  const ta = document.getElementById('pasteTextarea');
-  ta.value = '';
-  dialog.showModal();
-  setTimeout(() => ta.focus(), 50);
-}
-
-function closePasteImport() {
-  document.getElementById('pasteDialog').close();
-}
-
-async function confirmPasteImport(e, mode = 'merge') {
-  if (e) e.preventDefault();
-  const ta = document.getElementById('pasteTextarea');
-  const text = (ta.value || '').trim();
-  if (!text) return;
-
-  let data;
-  try {
-    data = parseImportPayload(text);
-  } catch {
-    alert('貼上的內容不是有效 JSON');
-    return;
-  }
-
-  const ok = await processImport(data, mode);
-  if (ok) closePasteImport();
 }
 
 // ── Init ─────────────────────────────────────────────
@@ -907,9 +862,8 @@ async function init() {
     document.getElementById('playerDialog').close();
   });
   document.getElementById('filterType').addEventListener('change', render);
+  document.getElementById('ledgerFilterType').addEventListener('change', renderLedger);
   document.getElementById('exportBtn').addEventListener('click', exportData);
-  document.getElementById('copyExportBtn').addEventListener('click', copyExportText);
-  document.getElementById('pasteImportBtn').addEventListener('click', openPasteImport);
   document.getElementById('refreshBtn')?.addEventListener('click', refreshFromRemote);
 
   document.getElementById('importFile').addEventListener('change', (e) => {
@@ -925,10 +879,6 @@ async function init() {
     if (e.target.files[0]) importData(e.target.files[0], 'overwrite');
     e.target.value = '';
   });
-
-  document.getElementById('pasteForm').addEventListener('submit', (e) => confirmPasteImport(e, 'merge'));
-  document.getElementById('pasteOverwrite').addEventListener('click', () => confirmPasteImport(null, 'overwrite'));
-  document.getElementById('pasteCancel').addEventListener('click', closePasteImport);
 
   render();
   updateSyncBar();
